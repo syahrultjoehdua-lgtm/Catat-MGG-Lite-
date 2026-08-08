@@ -16,7 +16,7 @@ export default function MasterExpenseType() {
   return (
     <div className="app-shell">
       <BackHeader title="Jenis pengeluaran" />
-      <main className="app-content">
+      <main className="app-content app-content-with-back-header">
         <div className="field" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <input
             value={namaBaru}

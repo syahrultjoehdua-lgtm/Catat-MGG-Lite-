@@ -12,6 +12,7 @@ import MasterQr from './pages/MasterData/MasterQr'
 import { cobaKirimSemuaSesiBelumTerkirim } from './services/sync'
 import { getAppSettings } from './db/db'
 import { primeAudio } from './utils/alarm'
+import GlobalAlarmWatcher from './components/GlobalAlarmWatcher'
 
 export default function App() {
   useEffect(() => {
@@ -43,15 +44,18 @@ export default function App() {
   }, [pengaturan?.temaGelap])
 
   return (
-    <Routes>
-      <Route path="/" element={<Splash />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/history" element={<History />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/akhiri-sesi" element={<AkhiriSesi />} />
-      <Route path="/settings/units" element={<MasterUnit />} />
-      <Route path="/settings/expense-types" element={<MasterExpenseType />} />
-      <Route path="/settings/qr" element={<MasterQr />} />
-    </Routes>
+    <>
+      <GlobalAlarmWatcher />
+      <Routes>
+        <Route path="/" element={<Splash />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/history" element={<History />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/akhiri-sesi" element={<AkhiriSesi />} />
+        <Route path="/settings/units" element={<MasterUnit />} />
+        <Route path="/settings/expense-types" element={<MasterExpenseType />} />
+        <Route path="/settings/qr" element={<MasterQr />} />
+      </Routes>
+    </>
   )
 }

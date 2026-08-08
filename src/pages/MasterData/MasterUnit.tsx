@@ -16,7 +16,7 @@ export default function MasterUnit() {
   return (
     <div className="app-shell">
       <BackHeader title="Master unit" />
-      <main className="app-content">
+      <main className="app-content app-content-with-back-header">
         <div className="field" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <input
             value={kodeBaru}

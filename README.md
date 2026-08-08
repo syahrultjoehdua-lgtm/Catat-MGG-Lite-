@@ -3,6 +3,10 @@
 PWA pencatatan sewa unit — versi sederhana dari "Maing Gali-gali".
 Spesifikasi lengkap: lihat `spesifikasi-catat-mgg-lite.md` di project ini.
 
+📖 **Dokumentasi lengkap** (arsitektur, logika bisnis, skema data, status
+fitur, rencana lanjutan, riwayat bug) ada di folder **[`docs/`](./docs/00-DAFTAR-ISI.md)**
+— mulai dari situ kalau baru pertama kali kenal project ini.
+
 ## Status: Semua 8 sesi selesai + perbaikan bug hasil testing
 
 Fitur inti lengkap: Splash → Dashboard (transaksi, timer, semua aksi kartu, alarm) →
@@ -42,6 +46,69 @@ callback effect yang baru jalan belakangan), jadi Dashboard langsung
 dipindah ke posisi yang benar. Sudah dicek juga ke seluruh file lain untuk pola
 yang sama, tidak ditemukan bug serupa di tempat lain.
 
+## Bug layout: Header/Bottom Nav/FAB sekarang benar-benar mengambang
+Perbaikan sebelumnya cuma membetulkan area scroll (`min-height:0`), tapi Header,
+Bottom Nav, dan FAB masih jadi bagian dari layout flex biasa — jadi FAB yang
+lebar barisnya penuh (walau tombolnya rata kanan) menyisakan ruang kosong
+kosong di sisinya. Sekarang ketiganya betul-betul `position: fixed`, lepas dari
+alur normal halaman:
+- `.app-header` & `.bottom-nav` — fixed di atas/bawah, diberi background solid
+  supaya konten yang scroll di baliknya tidak tembus pandang
+- `.fab-float` — fixed langsung membungkus tombolnya saja (tidak lagi jadi baris
+  selebar layar), jadi tidak ada lagi ruang kosong di sampingnya
+- `.app-content` diberi padding atas/bawah secukupnya supaya konten tidak
+  ketiban elemen yang mengambang ini
+- Halaman dengan `BackHeader` (Akhiri Sesi, Master Data) ikut disamakan
+  polanya supaya konsisten
+
+Konsekuensinya persis seperti yang diminta: kalau nanti Header/Nav/FAB perlu
+disembunyikan, tidak akan ada bekas ruang kosong sama sekali — karena mereka
+sudah lepas dari flow, bukan dititipkan lewat flex.
+
+## Bug: pop-up "waktu habis" cuma muncul di Dashboard (diperbaiki)
+Logika deteksi alarm sebelumnya ada di dalam komponen `Dashboard`, jadi otomatis
+berhenti begitu Dashboard di-unmount (user pindah ke Riwayat/Settings). Sekarang
+dipindah ke `src/components/GlobalAlarmWatcher.tsx`, dipasang di `App.tsx` di luar
+`<Routes>` — jalan terus di halaman manapun, tidak bergantung halaman mana yang
+sedang dibuka.
+
+**Soal alarm saat layar mati/terkunci**: sudah dijawab ke user bahwa ini di luar
+kemampuan PWA murni tanpa infrastruktur push server sungguhan, dan bahkan dengan
+itu pun tidak terjamin (banyak Android — terutama Samsung/Xiaomi — membatasi
+notifikasi PWA cuma muncul di status bar, bukan heads-up). Solusi andal perlu
+aplikasi native. Mitigasi yang realistis dalam kemampuan PWA: minta Screen Wake
+Lock terus-menerus selama ada transaksi aktif (bukan cuma setelah waktu habis),
+supaya layar tidak sempat mati sama sekali selagi dipakai — **belum
+diimplementasikan**, menunggu konfirmasi user apakah mau dikerjakan.
+
+## Bug diketahui, DITUNDA sampai user minta (jangan dikerjakan dulu)
+- Tab section "Sesi aktif / Sesi selesai" di halaman Riwayat seharusnya juga
+  mengambang/fixed di posisinya (ikut ter-scroll saat ini). Sekalian nanti hapus
+  teks keterangan "Baca langsung dari penyimpanan lokal, tanpa fetch ke server"
+  di bagian atas halaman Riwayat.
+
+## Migrasi ke native Android (Capacitor) — sedang berjalan
+Project ini sedang dibungkus jadi APK Android (lewat Capacitor) supaya bisa
+dapat kemampuan native (termasuk solusi alarm layar mati/terkunci lewat Local
+Notifications, dibahas setelah APK dasar terpasang & jalan baik). **Lihat
+`CAPACITOR_SETUP.md`** untuk langkah lengkapnya — bagian ini wajib dijalankan
+sendiri di komputer kamu (perlu Android Studio + SDK yang tidak tersedia di
+sandbox pengembangan saya).
+
+Yang sudah disiapkan di sisi project:
+- `capacitor.config.ts` — konfigurasi dasar (appId, nama app, warna native)
+- `package.json` — dependency Capacitor + script `cap:sync`, `cap:android`, `cap:open:android`
+- `.gitignore` — sudah diperbarui untuk artefak build Android
+
+Yang masih perlu kamu jalankan sendiri (lihat `CAPACITOR_SETUP.md`):
+1. `npx cap add android` — generate project native (sekali saja)
+2. Build & sinkronkan setiap ada perubahan kode
+3. Build APK debug untuk sideload
+
+**Workflow desktop (`npm run dev`) sama sekali tidak berubah** — tetap cara
+utama kerja sehari-hari; Capacitor cuma langkah tambahan di akhir kalau mau
+dibungkus ulang jadi APK.
+
 ## Yang masih terbuka
 - Logika "Gabung pembayaran" — masih placeholder, menunggu penjelasan alur dari kamu
 - Font Poppins masih via Google Fonts CDN (perlu internet saat load pertama) — bisa
@@ -56,3 +123,4 @@ yang sama, tidak ditemukan bug serupa di tempat lain.
 - `src/services/sync.ts` — kirim data sesi ke backend + retry/queue offline
 - `src/config.ts` — tempat isi `APPS_SCRIPT_URL`
 - `backend/` — script Google Apps Script + panduan deploy
+- `capacitor.config.ts`, `CAPACITOR_SETUP.md` — pembungkusan ke APK Android native

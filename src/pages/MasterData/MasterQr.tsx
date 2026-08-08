@@ -28,7 +28,7 @@ export default function MasterQr() {
   return (
     <div className="app-shell">
       <BackHeader title="QR pembayaran" />
-      <main className="app-content">
+      <main className="app-content app-content-with-back-header">
         {previewUrl ? (
           <div className="qr-box" style={{ width: '100%', height: 220, marginBottom: 16 }}>
             <img src={previewUrl} alt="QR pembayaran" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />

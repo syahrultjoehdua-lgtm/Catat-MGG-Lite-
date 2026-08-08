@@ -108,7 +108,7 @@ export default function AkhiriSesi() {
   return (
     <div className="app-shell">
       <BackHeader title="Akhiri sesi" to="/dashboard" />
-      <main className="app-content">
+      <main className="app-content app-content-with-back-header">
         {langkah === 'input' && (
           <div className="sheet-body">
             {jumlahUnitAktif > 0 && (

@@ -18,7 +18,7 @@ export default function AppShell({ title, subtitle, fab, children }: AppShellPro
           <h1>{title}</h1>
         </div>
       </header>
-      <main className="app-content app-content-with-nav">{children}</main>
+      <main className="app-content app-content-with-header app-content-with-nav">{children}</main>
 
       {fab && <div className="fab-float">{fab}</div>}
 

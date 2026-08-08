@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
 import UnitCard from '../components/UnitCard'
@@ -9,7 +9,6 @@ import EditSheet from '../components/EditSheet'
 import TukarUnitSheet from '../components/TukarUnitSheet'
 import PembayaranQrSheet from '../components/PembayaranQrSheet'
 import GabungPembayaranStub from '../components/GabungPembayaranStub'
-import AlarmOverlay from '../components/AlarmOverlay'
 import {
   db,
   getOrCreateActiveSession,
@@ -39,37 +38,16 @@ export default function Dashboard() {
   const [sesi, setSesi] = useState<SesiRecord | null>(null)
   const [sheet, setSheet] = useState<SheetAktif>(null)
   const [now, setNow] = useState(() => Date.now())
-  const [alarmUntuk, setAlarmUntuk] = useState<TransaksiRecord | null>(null)
-  const sudahDialarmRef = useRef<Set<number>>(new Set())
-  const transaksiAktifRef = useRef<TransaksiRecord[]>([])
-  const alarmUntukRef = useRef<TransaksiRecord | null>(null)
 
   useEffect(() => {
     getOrCreateActiveSession().then(setSesi)
   }, [])
 
   useEffect(() => {
-    alarmUntukRef.current = alarmUntuk
-  }, [alarmUntuk])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const sekarang = Date.now()
-      setNow(sekarang)
-
-      // Cek tiap detik (bukan cuma saat app dibuka lagi) supaya popup+alarm muncul
-      // otomatis begitu ada transaksi yang waktunya habis — baik app sedang dibuka
-      // (foreground) maupun baru dibuka lagi setelah sempat di-background/terkunci.
-      if (!alarmUntukRef.current) {
-        const kandidat = transaksiAktifRef.current.find(
-          (t) => t.id && !sudahDialarmRef.current.has(t.id) && !t.dijeda && sisaWaktuMs(t, sekarang) <= 0
-        )
-        if (kandidat?.id) {
-          sudahDialarmRef.current.add(kandidat.id)
-          setAlarmUntuk(kandidat)
-        }
-      }
-    }, 1000)
+    // Tick tiap detik untuk tampilan countdown di kartu. Deteksi alarm "waktu habis"
+    // sekarang ditangani GlobalAlarmWatcher (App.tsx) supaya tetap jalan di halaman
+    // manapun, bukan cuma saat Dashboard ini sedang dibuka.
+    const interval = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -81,10 +59,6 @@ export default function Dashboard() {
       .filter((t) => !t.selesai && !t.dibatalkan)
       .toArray()
   }, [sesi?.id])
-
-  useEffect(() => {
-    transaksiAktifRef.current = transaksiAktif ?? []
-  }, [transaksiAktif])
 
   const unitMaster = useLiveQuery(() => listUnitMaster(), []) ?? []
 
@@ -104,9 +78,6 @@ export default function Dashboard() {
     if (!transaksiAktif) return []
     return [...transaksiAktif].sort((a, b) => sisaWaktuMs(a, now) - sisaWaktuMs(b, now))
   }, [transaksiAktif, now])
-
-  // Alarm layar penuh dipicu dari pengecekan tiap detik di atas (bukan lagi dari
-  // visibilitychange saja) — lihat komentar di useEffect interval.
 
   const memuat = !sesi || transaksiAktif === undefined
 
@@ -227,17 +198,6 @@ export default function Dashboard() {
       )}
 
       {sheet?.jenis === 'gabungBayar' && <GabungPembayaranStub transaksi={sheet.t} onClose={() => setSheet(null)} />}
-
-      {alarmUntuk && (
-        <AlarmOverlay
-          transaksi={alarmUntuk}
-          onTangani={() => {
-            const t = alarmUntuk
-            setAlarmUntuk(null)
-            setSheet(t.statusBayar === 'belum' ? { jenis: 'bayarQr', t, tutupSetelahBayar: true } : { jenis: 'menu', t })
-          }}
-        />
-      )}
     </AppShell>
   )
 }
