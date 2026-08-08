@@ -14,6 +14,7 @@ import {
 } from '../db/db'
 import { cobaKirimSemuaSesiBelumTerkirim } from '../services/sync'
 import { buatGambarLaporanSesi, bagikanAtauUnduhGambar } from '../utils/laporanGambar'
+import { formatRibuan, parseRibuan } from '../utils/format'
 
 interface BarisPengeluaran {
   id: string
@@ -31,6 +32,8 @@ export default function AkhiriSesi() {
   const [langkah, setLangkah] = useState<'input' | 'konfirmasi' | 'selesai'>('input')
   const [saldoAwal, setSaldoAwal] = useState(0)
   const [pendapatan, setPendapatan] = useState(0)
+  const [pendapatanTunai, setPendapatanTunai] = useState(0)
+  const [pendapatanNonTunai, setPendapatanNonTunai] = useState(0)
   const [jumlahUnitAktif, setJumlahUnitAktif] = useState(0)
   const [jumlahUnitDisewa, setJumlahUnitDisewa] = useState(0)
   const [baris, setBaris] = useState<BarisPengeluaran[]>([])
@@ -55,6 +58,9 @@ export default function AkhiriSesi() {
       setSaldoAwal(saldoSebelumnya ?? 0)
       setJumlahUnitAktif(transaksiAktif.length)
       setJumlahUnitDisewa(semuaTransaksi.filter((t) => !t.dibatalkan).reduce((n, t) => n + t.kodeUnit.length, 0))
+      const transaksiDihitung = semuaTransaksi.filter((t) => !t.dibatalkan)
+      setPendapatanNonTunai(transaksiDihitung.filter((t) => t.nonTunai).reduce((s, t) => s + t.jumlahBayar, 0))
+      setPendapatanTunai(transaksiDihitung.filter((t) => !t.nonTunai).reduce((s, t) => s + t.jumlahBayar, 0))
     })()
   }, [])
 
@@ -120,7 +126,12 @@ export default function AkhiriSesi() {
 
             <div className="field">
               <p className="field-label">Saldo awal</p>
-              <input type="number" value={saldoAwal} onChange={(e) => setSaldoAwal(Number(e.target.value))} />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatRibuan(saldoAwal)}
+                onChange={(e) => setSaldoAwal(parseRibuan(e.target.value))}
+              />
             </div>
 
             <div className="field">
@@ -154,6 +165,8 @@ export default function AkhiriSesi() {
 
             <div className="card">
               <div className="ringkasan-row"><span>Pendapatan</span><span>{rupiah(pendapatan)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Tunai</span><span>{rupiah(pendapatanTunai)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Non-tunai</span><span>{rupiah(pendapatanNonTunai)}</span></div>
               <div className="ringkasan-row ringkasan-row-total"><span>Saldo akhir</span><span>{rupiah(saldoAkhir)}</span></div>
             </div>
 
@@ -171,6 +184,8 @@ export default function AkhiriSesi() {
             <div className="card">
               <div className="ringkasan-row"><span>Saldo awal</span><span>{rupiah(saldoAwal)}</span></div>
               <div className="ringkasan-row"><span>Pendapatan</span><span>{rupiah(pendapatan)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Tunai</span><span>{rupiah(pendapatanTunai)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Non-tunai</span><span>{rupiah(pendapatanNonTunai)}</span></div>
               <div className="ringkasan-row"><span>Pengeluaran</span><span>-{rupiah(totalPengeluaran)}</span></div>
               <div className="ringkasan-row ringkasan-row-total"><span>Saldo akhir</span><span>{rupiah(saldoAkhir)}</span></div>
             </div>
@@ -192,6 +207,8 @@ export default function AkhiriSesi() {
             <div className="card">
               <div className="ringkasan-row"><span>Saldo awal</span><span>{rupiah(saldoAwal)}</span></div>
               <div className="ringkasan-row"><span>Pendapatan</span><span>{rupiah(pendapatan)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Tunai</span><span>{rupiah(pendapatanTunai)}</span></div>
+              <div className="ringkasan-row" style={{ paddingLeft: 10 }}><span>&middot; Non-tunai</span><span>{rupiah(pendapatanNonTunai)}</span></div>
               <div className="ringkasan-row"><span>Pengeluaran</span><span>-{rupiah(totalPengeluaran)}</span></div>
               <div className="ringkasan-row ringkasan-row-total"><span>Saldo akhir</span><span>{rupiah(saldoAkhir)}</span></div>
             </div>

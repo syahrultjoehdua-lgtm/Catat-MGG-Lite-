@@ -1,6 +1,7 @@
 import type { TransaksiRecord } from '../db/db'
 import { sisaWaktuMs, formatCountdown } from '../utils/time'
 import { IconClockPlus, IconEdit, IconSwap, IconPause, IconPlay, IconCheck, IconFlag, IconTrash, IconMerge } from './icons'
+import { toBody } from '../utils/portal'
 
 interface CardMenuProps {
   transaksi: TransaksiRecord
@@ -36,7 +37,7 @@ export default function CardMenu({
   const sisaMs = sisaWaktuMs(transaksi, now)
   const habis = sisaMs <= 0
 
-  return (
+  return toBody(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">

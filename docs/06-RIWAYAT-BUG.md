@@ -299,6 +299,45 @@ aksi itu di desain baru.
 
 ---
 
+## Bug #8 — iOS PWA: Bottom Navigation menutupi Bottom Sheet
+
+**Ditemukan saat**: pengujian nyata di perangkat iOS (Safari/PWA "Add to Home
+Screen"), dilaporkan sebagai bug kritis karena menutupi tombol-tombol di
+sheet "Tambah Sewa".
+
+**Gejala**: khusus di iOS, elemen `.bottom-nav` (fixed, z-index 10) tampil DI
+ATAS `.sheet-backdrop` (fixed, z-index 50) — padahal secara angka z-index
+sheet jauh lebih tinggi. Di Android/Chrome perilakunya normal (sheet di atas
+nav), cuma di WebKit/Safari iOS yang bermasalah.
+
+**Akar masalah**: seluruh bottom sheet (`TambahSewaSheet`, `CardMenu`,
+`PerpanjangSheet`, `EditSheet`, `TukarUnitSheet`, `PembayaranQrSheet`, dan
+stub `GabungPembayaranStub` lama) dirender sebagai **children biasa** di
+dalam `<AppShell>` — yang berarti mereka jadi descendant dari `.app-content`,
+elemen dengan `overflow-y: auto` + `-webkit-overflow-scrolling: touch`. Di
+WebKit/Safari iOS, `position: fixed` pada descendant dari elemen scrollable
+seperti itu punya perilaku compositing/stacking-context yang berbeda dari
+Chrome — walau z-index-nya lebih tinggi secara angka, urutan tampil terhadap
+sibling fixed lain (seperti `.bottom-nav`, yang TIDAK bersarang di dalam
+`.app-content`) bisa jadi salah.
+
+**Perbaikan**: dibuat helper `src/utils/portal.tsx` (`toBody()`) yang
+membungkus `createPortal(node, document.body)` — semua bottom sheet sekarang
+dirender langsung sebagai child dari `<body>`, sejajar level root dengan
+`.bottom-nav`/`.fab-float`, bukan bersarang di dalam `.app-content` lagi.
+Ini memperbaiki masalahnya secara mendasar di semua sheet sekaligus (bukan
+cuma pasang z-index lebih tinggi lagi, yang tidak akan menyelesaikan akar
+masalah stacking-context iOS-nya).
+
+**Pelajaran**: kalau ada elemen `position: fixed` yang perilakunya aneh
+khusus di iOS Safari padahal z-index sudah benar, curigai dulu apakah
+elemen itu bersarang di dalam kontainer yang punya `overflow` +
+`-webkit-overflow-scrolling: touch` — WebKit terkenal punya banyak quirk di
+kombinasi ini. Solusi paling robust: portal ke `document.body`, bukan
+otak-atik angka z-index.
+
+---
+
 ## Ringkasan pola yang berulang
 
 Kalau dilihat lagi, sebagian besar bug di atas berasal dari 3 sumber

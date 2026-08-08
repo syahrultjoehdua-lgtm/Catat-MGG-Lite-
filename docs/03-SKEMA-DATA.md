@@ -43,6 +43,7 @@ multi-unit).
 | `selesai` | boolean? | `true` = transaksi sudah ditutup |
 | `dibatalkan` | boolean? | **Catatan**: field ini ADA di skema tapi tidak pernah dipakai — aksi "Batalkan" langsung `db.transaksi.delete()` (hapus permanen), bukan set flag ini. Dibiarkan di skema untuk kompatibilitas masa depan kalau nanti mau diubah jadi soft-delete |
 | `riwayatEdit` | `{waktu, ringkasan}[]`? | Audit trail — diisi otomatis tiap kali `editTransaksi()`, `perpanjangDurasi()`, `tukarUnit()`, `jedaTransaksi()`, dll dipanggil |
+| `groupId` | string? | **Baru**: ID kelompok fitur "Gabung Pembayaran". Transaksi lain dengan `groupId` sama tampil jadi 1 kartu gabungan di Dashboard (`GroupUnitCard`), tapi masing-masing tetap punya Rincian Sewa & tombol aksi sendiri — grouping ini murni tampilan, BUKAN penggabungan logika transaksi. Diisi lewat `gabungkanTransaksi()`, dilepas lewat `lepasDariGrup()`. Ada index Dexie (`transaksi.groupId`, versi skema 3) supaya `listAnggotaGrup()` cepat. Field ini BELUM diekspor ke Google Sheets (lihat `05-RENCANA-LANJUTAN.md`) |
 
 ### Tabel `pengeluaran`
 
@@ -93,10 +94,11 @@ Juga cuma 1 baris. Ditambahkan di sesi 8 (versi skema Dexie naik ke versi 2).
 ```ts
 this.version(1).stores({ sesi, transaksi, pengeluaran, unitMaster, jenisPengeluaranMaster, qrSetting })
 this.version(2).stores({ appSettings: '++id' })
+this.version(3).stores({ transaksi: '++id, sesiId, selesai, dibatalkan, groupId' }) // tambah index groupId (fitur Gabung Pembayaran)
 ```
 
 Kalau nanti perlu nambah tabel/field baru lagi, **jangan edit `version(1)`
-langsung** — tambahkan `this.version(3).stores({...})` baru, cuma isi
+langsung** — tambahkan `this.version(4).stores({...})` baru, cuma isi
 tabel/perubahan yang baru (Dexie otomatis mewariskan tabel yang tidak
 disebut dari versi sebelumnya). Ini standar cara Dexie menangani migrasi
 skema di HP user yang sudah punya data lama.

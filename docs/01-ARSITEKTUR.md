@@ -86,15 +86,18 @@ catat-mgg-lite/
 │   ├── components/              ← Komponen re-usable, kebanyakan "bottom sheet"
 │   │   ├── AppShell.tsx          ← Layout bersama: header + bottom nav + FAB
 │   │   ├── BackHeader.tsx        ← Header "← Kembali" untuk halaman non-AppShell
-│   │   ├── UnitCard.tsx          ← Kartu unit di Dashboard
-│   │   ├── CardMenu.tsx          ← Sheet "Rincian Sewa" (semua aksi transaksi)
+│   │   ├── UnitCard.tsx          ← Kartu unit tunggal di Dashboard
+│   │   ├── GroupUnitCard.tsx     ← Kartu gabungan (fitur Gabung Pembayaran)
+│   │   ├── CardMenu.tsx          ← Sheet "Rincian Sewa" (semua aksi transaksi, transaksi aktif)
+│   │   ├── HistoryRincianSheet.tsx ← Sheet "Rincian Sewa" versi History (transaksi selesai)
 │   │   ├── TambahSewaSheet.tsx   ← Form sewa baru
 │   │   ├── EditSheet.tsx         ← Form edit transaksi
 │   │   ├── PerpanjangSheet.tsx
-│   │   ├── TukarUnitSheet.tsx
-│   │   ├── PembayaranQrSheet.tsx
+│   │   ├── TukarUnitSheet.tsx    ← Tukar unit per-slot (Sebelum/Sesudah)
+│   │   ├── PembayaranQrSheet.tsx ← Termasuk opsi "Bayar nanti"
 │   │   ├── FullQrView.tsx        ← QR full-screen
-│   │   ├── GabungPembayaranStub.tsx ← Placeholder, lihat 05-RENCANA-LANJUTAN.md
+│   │   ├── GabungPembayaranSheet.tsx   ← Pilih timer lain untuk digabung
+│   │   ├── DataPembayaranGrupSheet.tsx ← "Lihat Data Pembayaran" kartu gabungan
 │   │   ├── AlarmOverlay.tsx      ← Tampilan pop-up alarm layar penuh
 │   │   ├── GlobalAlarmWatcher.tsx← "Otak" pendeteksi waktu habis, jalan di App.tsx
 │   │   └── icons.tsx             ← Semua ikon SVG inline
@@ -102,6 +105,7 @@ catat-mgg-lite/
 │   ├── utils/
 │   │   ├── time.ts               ← Hitung sisa waktu, warna ring, dll
 │   │   ├── format.ts             ← Format angka jadi "Rp15.000"
+│   │   ├── portal.tsx            ← Helper createPortal(node, document.body) — dipakai semua bottom sheet, perbaikan bug iOS (lihat 06-RIWAYAT-BUG.md Bug #8)
 │   │   ├── alarm.ts              ← Bunyi (Web Audio API) + getar + wake lock
 │   │   └── laporanGambar.ts      ← Generate gambar ringkasan sesi (Canvas)
 │   │

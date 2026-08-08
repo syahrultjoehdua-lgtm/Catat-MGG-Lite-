@@ -1,13 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import type { TransaksiRecord } from '../db/db'
-import { db, tandaiSudahDibayar, tutupTransaksi } from '../db/db'
+import { db, tandaiSudahDibayar, tutupTransaksi, tutupTransaksiBayarNanti } from '../db/db'
 import FullQrView from './FullQrView'
+import { toBody } from '../utils/portal'
 
 interface PembayaranQrSheetProps {
   transaksi: TransaksiRecord
   /** true: dipakai saat menutup transaksi (waktu habis / paksa selesai) — transaksi
-   * langsung ditutup setelah dibayar. false: "Bayar sekarang" dari Rincian Sewa,
+   * langsung ditutup setelah dibayar, atau bisa juga ditutup dulu & bayar belakangan
+   * lewat tombol "Bayar nanti". false: "Bayar sekarang" dari Rincian Sewa,
    * transaksi tetap berjalan, cuma status bayarnya yang berubah. */
   tutupSetelahBayar: boolean
   onClose: () => void
@@ -37,7 +39,15 @@ export default function PembayaranQrSheet({ transaksi, tutupSetelahBayar, onClos
     onClose()
   }
 
-  return (
+  async function handleBayarNanti() {
+    if (!transaksi.id) return
+    setMemproses(true)
+    await tutupTransaksiBayarNanti(transaksi.id)
+    setMemproses(false)
+    onClose()
+  }
+
+  return toBody(
     <>
       <div className="sheet-backdrop" onClick={onClose}>
         <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -64,12 +74,28 @@ export default function PembayaranQrSheet({ transaksi, tutupSetelahBayar, onClos
               Bayar dengan non-tunai
             </label>
 
-            <div className="two-col" style={{ marginTop: 16 }}>
-              <button onClick={onClose}>Batal</button>
-              <button className="fab" onClick={handleSudahDibayar} disabled={memproses}>
-                {memproses ? 'Menyimpan...' : 'Sudah dibayar'}
-              </button>
-            </div>
+            {tutupSetelahBayar ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+                <button className="fab" onClick={handleSudahDibayar} disabled={memproses}>
+                  {memproses ? 'Menyimpan...' : 'Sudah dibayar'}
+                </button>
+                <button onClick={handleBayarNanti} disabled={memproses}>
+                  Bayar nanti
+                </button>
+                <button onClick={onClose} disabled={memproses}>Batal</button>
+                <p className="field-hint">
+                  &ldquo;Bayar nanti&rdquo; menutup transaksi ini sekarang, statusnya tetap belum dibayar dan
+                  bisa ditagih &amp; ditandai lunas nanti dari layar Riwayat.
+                </p>
+              </div>
+            ) : (
+              <div className="two-col" style={{ marginTop: 16 }}>
+                <button onClick={onClose} disabled={memproses}>Batal</button>
+                <button className="fab" onClick={handleSudahDibayar} disabled={memproses}>
+                  {memproses ? 'Menyimpan...' : 'Sudah dibayar'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

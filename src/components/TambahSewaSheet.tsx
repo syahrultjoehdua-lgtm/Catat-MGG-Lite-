@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { tambahSewa, type UnitMaster } from '../db/db'
 import { IconCamera } from './icons'
 import { formatRibuan, parseRibuan } from '../utils/format'
+import { toBody } from '../utils/portal'
 
 interface TambahSewaSheetProps {
   sesiId: number
@@ -65,7 +66,7 @@ export default function TambahSewaSheet({ sesiId, unitTersedia, riwayatNama, onC
     }
   }
 
-  return (
+  return toBody(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">

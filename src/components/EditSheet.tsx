@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, editTransaksi, tukarUnit, listUnitMaster, type TransaksiRecord } from '../db/db'
 import { sisaWaktuMs } from '../utils/time'
 import { formatRibuan, parseRibuan } from '../utils/format'
+import { toBody } from '../utils/portal'
 
 export default function EditSheet({ transaksi, onClose }: { transaksi: TransaksiRecord; onClose: () => void }) {
   const now = Date.now()
@@ -48,7 +49,7 @@ export default function EditSheet({ transaksi, onClose }: { transaksi: Transaksi
     onClose()
   }
 
-  return (
+  return toBody(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">

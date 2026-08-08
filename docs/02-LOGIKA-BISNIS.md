@@ -36,12 +36,16 @@ sekaligus (fitur "multi-unit"). Aturannya:
   dobel) — logikanya ada di `getKodeUnitSedangDisewa()`.
 - **Tukar Unit** (salah satu aksi di Rincian Sewa) memang sengaja dibuat
   terpisah dari "Edit" — supaya ganti kode unit **tidak mereset timer** yang
-  sedang berjalan. Tapi setelah revisi, field kode unit juga muncul di form
-  Edit langsung (redundan dengan Tukar Unit secara sengaja, supaya user tidak
-  bingung harus buka menu mana untuk koreksi unit yang salah input) — baik
-  dari Edit maupun dari Tukar Unit, keduanya sama-sama memanggil fungsi
-  `tukarUnit()` di `db.ts`, jadi tidak ada duplikasi logika, cuma duplikasi
-  akses di UI.
+  sedang berjalan. UI-nya **per-slot**: tiap unit lama yang menempel di
+  transaksi dapat 1 baris "Sebelum → Sesudah" sendiri (dropdown), jadi tidak
+  mungkin 1 unit baru dipilih dobel untuk 2 slot berbeda, dan jelas terlihat
+  unit mana ditukar jadi apa. Ini murni untuk kasus **tukar 1-ke-1** — kalau
+  mau menambah/mengurangi jumlah unit dalam transaksi (bukan sekadar tukar),
+  itu lewat form Edit langsung (field kode unit di sana tetap freeform
+  multi-select) — baik dari Edit maupun dari Tukar Unit, keduanya sama-sama
+  memanggil fungsi `tukarUnit()` di `db.ts`, jadi tidak ada duplikasi logika,
+  cuma duplikasi akses di UI untuk 2 kebutuhan yang beda (tukar murni vs
+  ubah bebas).
 
 ## 3. Timer & Ring Countdown
 
@@ -92,13 +96,14 @@ tap kartu untuk buka sheet "Rincian Sewa" yang berisi semua aksi berikut:
 
 | Aksi | Fungsi di `db.ts` | Catatan |
 |---|---|---|
-| **Perpanjangan** | `perpanjangDurasi(id, tambahMenit)` | Menambah `durasiMenit`, **tidak** mengubah `waktuMulai` |
+| **Perpanjangan** | `perpanjangDurasi(id, tambahMenit, tambahBayar?)` | Menambah `durasiMenit`, **tidak** mengubah `waktuMulai`. Opsional sekalian menambah `jumlahBayar` (mis. pelanggan minta tambah waktu sekaligus bayar tambahan) |
 | **Edit** | `editTransaksi(id, patch, now)` | Bisa ubah nama, foto, sisa waktu, jumlah bayar, status bayar, DAN kode unit (lihat poin 2 di atas). Tiap perubahan dicatat ke `riwayatEdit` (audit trail) |
-| **Tukar unit** | `tukarUnit(id, kodeBaru)` | Ganti kode unit tanpa reset timer |
+| **Tukar unit** | `tukarUnit(id, kodeBaru[])` | Ganti kode unit tanpa reset timer. UI-nya **per-slot** (`TukarUnitSheet`): tiap unit lama di transaksi dapat 1 dropdown "Sesudah" sendiri, bukan 1 daftar chip campur — supaya tidak bisa asal pilih banyak unit baru untuk 1 slot lama (lihat `06-RIWAYAT-BUG.md` konteks perbaikannya) |
 | **Jeda** | `jedaTransaksi(id)` | Set `dijeda: true`, catat `waktuJedaMulai` |
 | **Lanjutkan** | `lanjutkanTransaksi(id, now)` | Akumulasikan waktu jeda ke `totalMenitJeda`, set `dijeda: false` |
 | **Bayar sekarang** | (buka `PembayaranQrSheet` dengan `tutupSetelahBayar={false}`) | Transaksi **tetap berjalan** setelah dibayar — beda dari alur "waktu habis" |
-| **Gabung pembayaran** | *(belum ada — placeholder)* | Lihat `05-RENCANA-LANJUTAN.md` |
+| **Bayar nanti** | `tutupTransaksiBayarNanti(id)` | Tutup transaksi TANPA menandai lunas — dipicu dari `PembayaranQrSheet` saat waktu habis. `statusBayar` tetap `'belum'`, muncul di History dengan badge "Bayar nanti", ditagih & ditandai lunas belakangan lewat `HistoryRincianSheet` |
+| **Gabung pembayaran** | `gabungkanTransaksi(idUtama, idLain[])` | Set `groupId` sama ke beberapa transaksi (aktif maupun sudah selesai) di 1 sesi, supaya tampil jadi 1 kartu gabungan (`GroupUnitCard`) di Dashboard. Murni tampilan — tidak menggabung logika/aksi transaksi masing-masing. Lihat §6 di bawah |
 | **Paksa selesai** | `tutupTransaksi(id)` (langsung, atau lewat `PembayaranQrSheet` dulu kalau belum bayar) | Menutup transaksi sebelum/tanpa menunggu waktu habis |
 | **Batalkan/Hapus** | `hapusTransaksi(id)` | **Hapus permanen** dari database (bukan soft-delete/flag) — makanya selalu diminta konfirmasi (`confirm()` browser) sebelum eksekusi |
 
@@ -116,6 +121,12 @@ maksud beda (dibedakan lewat prop `tutupSetelahBayar`):
    dicatat sudah dibayar duluan) → `tutupSetelahBayar: false`, transaksi
    TIDAK ditutup, cuma `statusBayar` yang berubah jadi "sudah".
 
+Saat `tutupSetelahBayar: true`, `PembayaranQrSheet` menampilkan 3 pilihan:
+**"Sudah dibayar"** (tandai lunas + tutup), **"Bayar nanti"** (tutup transaksi
+tapi `statusBayar` dibiarkan `'belum'` — lewat `tutupTransaksiBayarNanti()`,
+ditagih belakangan dari History), atau **"Batal"** (transaksi tetap terbuka,
+tidak ada yang berubah).
+
 Di dalam `PembayaranQrSheet`:
 - Menampilkan gambar QR dari `qrSetting` (kalau sudah diset di Master QR) —
   kalau belum ada, tampil placeholder + arahan ke Settings.
@@ -124,9 +135,51 @@ Di dalam `PembayaranQrSheet`:
 - Gambar QR bisa di-tap untuk lihat 100% layar (`FullQrView.tsx`) — tap
   sekali untuk tombol tutup, usap ke bawah untuk langsung keluar.
 
-## 6. Sistem Alarm
+## 6. Gabung Pembayaran
 
-### 6.1 Kapan alarm muncul
+**Tujuan**: kadang beberapa unit disewa oleh 1 pelanggan yang sama tapi
+dicatat sebagai transaksi terpisah (misalnya beda waktu mulai, atau
+awalnya dikira pelanggan berbeda) — fitur ini menggabungkan **tampilannya**
+saja di Dashboard jadi 1 kartu, supaya lebih mudah dilihat & ditagih
+sekaligus, TANPA menggabungkan logika/data transaksinya.
+
+**Cara kerja**:
+1. Dari Rincian Sewa transaksi manapun, tombol "Gabung pembayaran" membuka
+   `GabungPembayaranSheet` — daftar transaksi lain di sesi yang sama,
+   dikelompokkan & diurutkan: **timer aktif → timer selesai belum bayar →
+   timer selesai sudah bayar**.
+2. Setelah dipilih & disimpan, `gabungkanTransaksi()` menandai transaksi
+   utama + semua yang dipilih dengan `groupId` yang sama (UUID). Kalau ada
+   anggota yang ternyata sudah tergabung ke grup lain sebelumnya, seluruh
+   anggota grup lama itu ikut ditarik masuk ke grup baru — supaya tidak ada
+   grup yang "terbelah" jadi 2.
+3. Di Dashboard, transaksi aktif yang berbagi `groupId` sama dirender lewat
+   `GroupUnitCard` (bukan `UnitCard` biasa) — 1 kartu berisi beberapa baris
+   mini, satu per anggota aktif. **Tiap baris tetap membuka `CardMenu`
+   (Rincian Sewa) miliknya sendiri saat diketuk** — grouping ini murni
+   tampilan, tombol aksi (Perpanjangan, Jeda, Tukar Unit, dst.) tetap
+   per-transaksi individual, tidak disatukan.
+4. Anggota grup yang **sudah selesai** (timernya sudah ditutup) tidak ikut
+   tampil sebagai baris di `GroupUnitCard` Dashboard (karena Dashboard cuma
+   menampilkan transaksi aktif) — tapi tetap terhitung di judul kartu
+   ("Gabungan pembayaran · N unit") dan tetap muncul di sheet "Lihat Data
+   Pembayaran".
+5. Tombol **"Lihat data pembayaran"** di kartu gabungan membuka
+   `DataPembayaranGrupSheet`, yang memuat SEMUA anggota grup lewat
+   `listAnggotaGrup(groupId)` (aktif maupun selesai) — masing-masing baris
+   menampilkan durasi & jumlah bayar, dengan tombol "Bayar unit ini" sendiri
+   (memanggil `tandaiSudahDibayar()` untuk 1 transaksi itu saja), plus
+   tombol "Bayar sekaligus" yang menandai lunas semua anggota yang masih
+   `statusBayar: 'belum'` dalam satu aksi.
+
+**Yang sengaja TIDAK dilakukan**: menggabungkan `jumlahBayar` beberapa
+transaksi jadi 1 angka, atau membuat 1 timer gabungan. Tiap transaksi tetap
+independen sepenuhnya di database — `groupId` cuma penanda "tampilkan
+bersebelahan", bukan penggabungan data.
+
+## 7. Sistem Alarm
+
+### 7.1 Kapan alarm muncul
 
 `GlobalAlarmWatcher` (lihat `01-ARSITEKTUR.md` bagian 7) mengecek **setiap
 detik** apakah ada transaksi aktif yang `sisaWaktuMs <= 0` DAN belum pernah
@@ -135,7 +188,7 @@ sudah pernah memicu alarm, supaya tidak berulang-ulang untuk transaksi yang
 sama). Begitu ketemu, muncul `AlarmOverlay` — pop-up layar penuh dengan bunyi
 + getar + wake lock (layar dipaksa tetap menyala).
 
-### 6.2 Kenapa alarm sempat tidak bunyi sama sekali (dan cara memperbaikinya)
+### 7.2 Kenapa alarm sempat tidak bunyi sama sekali (dan cara memperbaikinya)
 
 Browser modern **memblokir suara yang dibunyikan otomatis** oleh JavaScript
 tanpa sentuhan pengguna langsung sebelumnya (disebut *autoplay policy*).
@@ -151,7 +204,7 @@ dipakai lagi belakangan oleh kode otomatis (`setInterval`) tanpa diblokir
 lagi — asal instance `AudioContext`-nya sama (makanya `alarm.ts` pakai satu
 variabel module-level `audioCtx`, bukan bikin baru tiap kali).
 
-### 6.3 Batasan besar: TIDAK bisa bunyi/muncul saat layar HP benar-benar mati
+### 7.3 Batasan besar: TIDAK bisa bunyi/muncul saat layar HP benar-benar mati
 
 Ini sudah didiskusikan panjang dengan pemilik project — rangkumannya:
 
@@ -175,7 +228,7 @@ Ini sudah didiskusikan panjang dengan pemilik project — rangkumannya:
   dipakai kerja. **Ini belum diimplementasikan** — idenya baru sebatas
   didiskusikan.
 
-## 7. Akhiri Sesi
+## 8. Akhiri Sesi
 
 Alur 2 langkah, sesuai spesifikasi asli bagian 3.6:
 
@@ -202,7 +255,7 @@ setelah tekan "Ya, Selesaikan Sesi".
 5. Layar sukses muncul dengan tombol "Bagikan laporan" (gambar PNG, dibuat
    lewat Canvas API — lihat `laporanGambar.ts`)
 
-## 8. Sinkronisasi ke backend (Google Sheets)
+## 9. Sinkronisasi ke backend (Google Sheets)
 
 - Payload disusun oleh `susunPayloadSesi()` di `src/services/sync.ts`,
   formatnya mengikuti struktur 2 sheet di `03-SKEMA-DATA.md`.

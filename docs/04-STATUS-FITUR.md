@@ -16,12 +16,12 @@ Legenda: ✅ Selesai · ⚠️ Selesai dengan catatan · ⏸️ Placeholder/ditu
 | 3.3 Dashboard — daftar kartu unit | ✅ | Diurutkan sisa waktu tersingkat |
 | 3.3 Form Sewa Baru | ✅ | Semua field sesuai (kode unit, nama, foto, durasi, jumlah bayar, status bayar) |
 | 3.3 Transaksi Multi-Unit | ✅ | 1 transaksi/1 timer/1 pembayaran |
-| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa" |
-| 3.3 Alarm waktu habis (foreground vs background) | ⚠️ | Foreground: kartu merah + badge berkedip ✅. Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §6.3 dan `05-RENCANA-LANJUTAN.md` |
-| 3.3 Alur bayar QR saat waktu habis | ✅ | Plus ditambah: bisa dipicu manual ("Bayar sekarang") tanpa harus nunggu waktu habis |
-| 3.4 History | ⚠️ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI) — lihat `02-LOGIKA-BISNIS.md`. Ada bug kecil belum dibetulkan, lihat `05-RENCANA-LANJUTAN.md` |
+| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan sekarang juga bisa sekalian tambah jumlah bayar (opsional), Tukar Unit sekarang per-slot (Sebelum/Sesudah per unit, bukan 1 daftar chip campur) |
+| 3.3 Alarm waktu habis (foreground vs background) | ⚠️ | Foreground: kartu merah + badge berkedip ✅. Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §7.3 dan `05-RENCANA-LANJUTAN.md` |
+| 3.3 Alur bayar QR saat waktu habis | ✅ | Plus ditambah: bisa dipicu manual ("Bayar sekarang") tanpa harus nunggu waktu habis; plus opsi "Bayar nanti" (tutup transaksi tanpa bayar dulu, ditagih & ditandai lunas belakangan dari History) |
+| 3.4 History | ✅ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI). Tap kartu membuka Rincian Sewa versi History (`HistoryRincianSheet`), header menampilkan sub-total uang masuk sesuai tab aktif, bug tab bar ikut ter-scroll sudah diperbaiki (`position: sticky`) |
 | 3.5 Master Data (Unit, Jenis Pengeluaran, QR) | ✅ | Semua CRUD lengkap |
-| 3.6 Akhiri Sesi (2 langkah) | ✅ | Plus ditambah langkah ke-3: layar sukses dengan tombol bagikan laporan |
+| 3.6 Akhiri Sesi (2 langkah) | ✅ | Plus ditambah langkah ke-3: layar sukses dengan tombol bagikan laporan. Input Saldo Awal pakai format titik ribuan, rincian pendapatan menampilkan sub-total Tunai vs Non-tunai |
 | 3.6 Retry/queue offline | ✅ | Otomatis saat buka app & saat online, plus tombol manual |
 | 3.7 Export/Bagikan laporan gambar | ✅ | Pakai Canvas API, Web Share API dengan fallback unduh |
 | 4. Struktur data backend | ⚠️ | **Diubah dari spesifikasi**: jadi 2 sheet terpisah (bukan 1 sheet + kolom Tipe Baris) — permintaan pemilik project di tengah pengembangan |
@@ -46,8 +46,17 @@ selama pengembangan:
 - **Format titik ribuan** untuk input nominal manual
 - **Pengaturan Volume/Getar Alarm & Tema Gelap** — tersimpan di IndexedDB,
   dipakai nyata (bukan cuma UI kosong)
-- **Tombol "Gabung pembayaran"** — placeholder, menunggu penjelasan alur
-  kerja dari pemilik project (lihat `05-RENCANA-LANJUTAN.md`)
+- **Fitur "Gabung Pembayaran"** — selesai diimplementasikan. Menggabungkan
+  tampilan beberapa transaksi (aktif maupun sudah selesai) dalam 1 sesi jadi
+  1 kartu di Dashboard (`GroupUnitCard`), lewat field `groupId` di
+  `TransaksiRecord` (lihat `03-SKEMA-DATA.md`). Grouping murni tampilan —
+  tiap anggota tetap punya Rincian Sewa & tombol aksi sendiri-sendiri.
+  Kartu gabungan punya tombol "Lihat Data Pembayaran" yang membuka rincian
+  durasi & jumlah bayar per unit, bisa dibayar satu-satu atau sekaligus
+- **Perbaikan bug kritis iOS: Bottom Sheet vs Bottom Nav** — semua bottom
+  sheet sekarang dirender lewat React portal ke `document.body`
+  (`src/utils/portal.tsx`), bukan lagi bersarang di `.app-content` — lihat
+  `06-RIWAYAT-BUG.md` Bug #8
 
 ## Session log (untuk konteks historis)
 
@@ -70,3 +79,11 @@ tetap fokus ke status fitur, bukan riwayat debugging.
 
 Setelah itu sempat dimulai **migrasi ke Capacitor (Android native)** — status:
 **ditunda**, lihat `05-RENCANA-LANJUTAN.md`.
+
+Sesi lanjutan berikutnya (setelah dokumentasi `docs/` ini pertama kali
+dibuat): perbaikan bug kritis iOS bottom sheet, penambahan field jumlah bayar
+di Perpanjangan, rombak Tukar Unit jadi per-slot, fitur "Bayar nanti", Rincian
+Sewa versi History, sub-total header Riwayat, format ribuan & sub-total
+tunai/non-tunai di Akhiri Sesi, dan implementasi penuh fitur "Gabung
+Pembayaran" yang sebelumnya masih placeholder — lihat `06-RIWAYAT-BUG.md`
+Bug #8 untuk detail bug iOS-nya.

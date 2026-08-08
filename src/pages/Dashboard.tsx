@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
 import UnitCard from '../components/UnitCard'
+import GroupUnitCard from '../components/GroupUnitCard'
 import TambahSewaSheet from '../components/TambahSewaSheet'
 import CardMenu from '../components/CardMenu'
 import PerpanjangSheet from '../components/PerpanjangSheet'
 import EditSheet from '../components/EditSheet'
 import TukarUnitSheet from '../components/TukarUnitSheet'
 import PembayaranQrSheet from '../components/PembayaranQrSheet'
-import GabungPembayaranStub from '../components/GabungPembayaranStub'
+import GabungPembayaranSheet from '../components/GabungPembayaranSheet'
+import DataPembayaranGrupSheet from '../components/DataPembayaranGrupSheet'
 import {
   db,
   getOrCreateActiveSession,
@@ -32,6 +34,7 @@ type SheetAktif =
   | { jenis: 'tukarUnit'; t: TransaksiRecord }
   | { jenis: 'bayarQr'; t: TransaksiRecord; tutupSetelahBayar: boolean }
   | { jenis: 'gabungBayar'; t: TransaksiRecord }
+  | { jenis: 'dataPembayaran'; groupId: string }
   | null
 
 export default function Dashboard() {
@@ -69,6 +72,19 @@ export default function Dashboard() {
 
   const riwayatNama = useLiveQuery(() => getRiwayatNamaPelanggan(), [transaksiAktif]) ?? []
 
+  // Jumlah anggota grup yang sudah selesai (tidak masuk daftar aktif) — dihitung
+  // supaya kartu gabungan tetap menampilkan total unit yang benar walau sebagian
+  // anggotanya sudah tidak berjalan lagi.
+  const jumlahSelesaiPerGroup = useLiveQuery(async () => {
+    const semuaBerGrup = await db.transaksi.filter((t) => !!t.groupId && !!t.selesai && !t.dibatalkan).toArray()
+    const peta = new Map<string, number>()
+    for (const t of semuaBerGrup) {
+      if (!t.groupId) continue
+      peta.set(t.groupId, (peta.get(t.groupId) ?? 0) + 1)
+    }
+    return peta
+  }, []) ?? new Map<string, number>()
+
   const unitTersedia = useMemo(
     () => unitMaster.filter((u) => !unitSedangDisewa.includes(u.kodeUnit)),
     [unitMaster, unitSedangDisewa]
@@ -78,6 +94,25 @@ export default function Dashboard() {
     if (!transaksiAktif) return []
     return [...transaksiAktif].sort((a, b) => sisaWaktuMs(a, now) - sisaWaktuMs(b, now))
   }, [transaksiAktif, now])
+
+  // Kelompokkan transaksi aktif berdasarkan groupId untuk kartu gabungan
+  // (Gabung Pembayaran) — urutan tampil tetap mengikuti daftarTerurut (paling
+  // mendesak dulu), grup ditempatkan di posisi anggota pertamanya yang muncul.
+  const itemTampil = useMemo(() => {
+    const hasil: ({ tipe: 'tunggal'; t: TransaksiRecord } | { tipe: 'grup'; groupId: string; anggota: TransaksiRecord[] })[] = []
+    const sudahDitampilkan = new Set<string>()
+    for (const t of daftarTerurut) {
+      if (t.groupId) {
+        if (sudahDitampilkan.has(t.groupId)) continue
+        sudahDitampilkan.add(t.groupId)
+        const anggota = daftarTerurut.filter((x) => x.groupId === t.groupId)
+        hasil.push({ tipe: 'grup', groupId: t.groupId, anggota })
+      } else {
+        hasil.push({ tipe: 'tunggal', t })
+      }
+    }
+    return hasil
+  }, [daftarTerurut])
 
   const memuat = !sesi || transaksiAktif === undefined
 
@@ -140,16 +175,29 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="unit-card-list">
-          {daftarTerurut.map((t) => (
-            <UnitCard
-              key={t.id}
-              transaksi={t}
-              now={now}
-              onTapKartu={() => setSheet({ jenis: 'menu', t })}
-              onLanjutkan={() => handleJedaLanjut(t)}
-              onWaktuHabis={() => handleWaktuHabis(t)}
-            />
-          ))}
+          {itemTampil.map((item) =>
+            item.tipe === 'tunggal' ? (
+              <UnitCard
+                key={item.t.id}
+                transaksi={item.t}
+                now={now}
+                onTapKartu={() => setSheet({ jenis: 'menu', t: item.t })}
+                onLanjutkan={() => handleJedaLanjut(item.t)}
+                onWaktuHabis={() => handleWaktuHabis(item.t)}
+              />
+            ) : (
+              <GroupUnitCard
+                key={item.groupId}
+                anggotaAktif={item.anggota}
+                jumlahAnggotaLain={jumlahSelesaiPerGroup.get(item.groupId) ?? 0}
+                now={now}
+                onTapAnggota={(t) => setSheet({ jenis: 'menu', t })}
+                onLanjutkanAnggota={(t) => handleJedaLanjut(t)}
+                onWaktuHabisAnggota={(t) => handleWaktuHabis(t)}
+                onLihatDataPembayaran={() => setSheet({ jenis: 'dataPembayaran', groupId: item.groupId })}
+              />
+            )
+          )}
         </div>
       )}
 
@@ -197,7 +245,11 @@ export default function Dashboard() {
         />
       )}
 
-      {sheet?.jenis === 'gabungBayar' && <GabungPembayaranStub transaksi={sheet.t} onClose={() => setSheet(null)} />}
+      {sheet?.jenis === 'gabungBayar' && <GabungPembayaranSheet transaksi={sheet.t} onClose={() => setSheet(null)} />}
+
+      {sheet?.jenis === 'dataPembayaran' && (
+        <DataPembayaranGrupSheet groupId={sheet.groupId} onClose={() => setSheet(null)} />
+      )}
     </AppShell>
   )
 }

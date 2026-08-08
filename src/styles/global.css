@@ -261,6 +261,8 @@ input {
   50% { opacity: 0.55; }
 }
 
+.group-card-row { padding: 10px; border-radius: var(--radius-sm); }
+
 .rincian-group { display: flex; flex-direction: column; gap: 2px; }
 .rincian-row {
   display: flex;
@@ -382,6 +384,14 @@ input {
   border-radius: 6px;
 }
 .tab-item-active { background: var(--color-surface); color: var(--color-text-primary); }
+.tab-row-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--color-bg);
+  padding-top: 4px;
+  margin-top: -4px;
+}
 
 .history-group-header {
   display: flex;
@@ -560,6 +570,27 @@ input {
   width: 100%;
 }
 .stepper-input:focus { outline: none; }
+
+.tukar-unit-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.tukar-unit-slot { flex: 1; min-width: 0; }
+.tukar-unit-slot select { width: 100%; }
+.tukar-unit-badge {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  color: var(--color-text-primary);
+  font-weight: 500;
+  text-align: center;
+}
+.tukar-unit-arrow { color: var(--color-text-muted); padding-bottom: 10px; flex-shrink: 0; }
 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .toggle-btn-active-success { background: var(--color-success-soft); color: var(--color-success); border-color: var(--color-success); }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
 import EditSheet from '../components/EditSheet'
+import HistoryRincianSheet from '../components/HistoryRincianSheet'
 import { db, listPengeluaranSesi, type TransaksiRecord } from '../db/db'
 import { buatGambarLaporanSesi, bagikanAtauUnduhGambar, type DataLaporanSesi } from '../utils/laporanGambar'
 
@@ -12,8 +13,12 @@ function formatJam(iso?: string) {
 function formatTanggalSesi(iso: string) {
   return new Date(iso).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
 }
+function rupiah(n: number) {
+  return `Rp${n.toLocaleString('id-ID')}`
+}
 
 function BarisTransaksi({ t, onTap }: { t: TransaksiRecord; onTap: () => void }) {
+  const bayarNanti = !!t.selesai && t.statusBayar === 'belum'
   return (
     <div className="history-row" onClick={onTap}>
       <div className="history-row-top">
@@ -24,29 +29,18 @@ function BarisTransaksi({ t, onTap }: { t: TransaksiRecord; onTap: () => void })
         {formatJam(t.waktuMulai)} &rarr; {formatJam(t.waktuSelesai)} &middot; {t.durasiMenit} menit
       </p>
       <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-        {t.statusBayar === 'belum' && <span className="badge badge-warning">Belum bayar</span>}
+        {bayarNanti && <span className="badge badge-warning">Bayar nanti</span>}
         {t.statusBayar === 'sudah' && (
           <span className="badge badge-success">Sudah bayar{t.nonTunai ? ' \u00b7 non-tunai' : ''}</span>
         )}
       </div>
-      {t.riwayatEdit && t.riwayatEdit.length > 0 && (
-        <details onClick={(e) => e.stopPropagation()}>
-          <summary className="field-hint">{t.riwayatEdit.length} perubahan tercatat</summary>
-          <ul className="audit-list">
-            {t.riwayatEdit.map((r, i) => (
-              <li key={i}>
-                {formatJam(r.waktu)} &middot; {r.ringkasan}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   )
 }
 
 export default function History() {
   const [tab, setTab] = useState<'aktif' | 'selesai'>('aktif')
+  const [transaksiDilihat, setTransaksiDilihat] = useState<TransaksiRecord | null>(null)
   const [transaksiDiedit, setTransaksiDiedit] = useState<TransaksiRecord | null>(null)
   const [membagikan, setMembagikan] = useState(false)
 
@@ -107,9 +101,16 @@ export default function History() {
     return [...transaksiSesiAktif].sort((a, b) => new Date(b.waktuMulai).getTime() - new Date(a.waktuMulai).getTime())
   }, [transaksiSesiAktif])
 
+  // Sub-total uang masuk untuk tab yang sedang dilihat, ditampilkan di header.
+  const subtotal = useMemo(() => {
+    if (tab === 'aktif') return terurutAktif.reduce((s, t) => s + t.jumlahBayar, 0)
+    if (!kelompokSelesai) return 0
+    return kelompokSelesai.reduce((s, g) => s + g.transaksi.reduce((s2, t) => s2 + t.jumlahBayar, 0), 0)
+  }, [tab, terurutAktif, kelompokSelesai])
+
   return (
-    <AppShell title="Riwayat" subtitle="Baca langsung dari penyimpanan lokal, tanpa fetch ke server">
-      <div className="tab-row">
+    <AppShell title="Riwayat" subtitle={`Total masuk ${tab === 'aktif' ? 'sesi ini' : 'semua sesi selesai'}: ${rupiah(subtotal)}`}>
+      <div className="tab-row tab-row-sticky">
         <button className={tab === 'aktif' ? 'tab-item tab-item-active' : 'tab-item'} onClick={() => setTab('aktif')}>
           Sesi aktif
         </button>
@@ -127,7 +128,7 @@ export default function History() {
         ) : (
           <div className="history-list">
             {terurutAktif.map((t) => (
-              <BarisTransaksi key={t.id} t={t} onTap={() => setTransaksiDiedit(t)} />
+              <BarisTransaksi key={t.id} t={t} onTap={() => setTransaksiDilihat(t)} />
             ))}
           </div>
         )
@@ -164,12 +165,23 @@ export default function History() {
                 {[...grup.transaksi]
                   .sort((a, b) => new Date(b.waktuMulai).getTime() - new Date(a.waktuMulai).getTime())
                   .map((t) => (
-                    <BarisTransaksi key={t.id} t={t} onTap={() => setTransaksiDiedit(t)} />
+                    <BarisTransaksi key={t.id} t={t} onTap={() => setTransaksiDilihat(t)} />
                   ))}
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {transaksiDilihat && (
+        <HistoryRincianSheet
+          transaksi={transaksiDilihat}
+          onClose={() => setTransaksiDilihat(null)}
+          onEdit={() => {
+            setTransaksiDiedit(transaksiDilihat)
+            setTransaksiDilihat(null)
+          }}
+        />
       )}
 
       {transaksiDiedit && <EditSheet transaksi={transaksiDiedit} onClose={() => setTransaksiDiedit(null)} />}

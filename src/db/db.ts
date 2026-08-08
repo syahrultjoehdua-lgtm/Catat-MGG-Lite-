@@ -36,6 +36,9 @@ export interface TransaksiRecord {
   selesai?: boolean
   dibatalkan?: boolean
   riwayatEdit?: RiwayatEditEntry[]
+  /** ID kelompok "Gabung Pembayaran" — transaksi lain dengan groupId sama tampil
+   * jadi 1 kartu gabungan, tapi tetap punya Rincian Sewa & tombol aksi sendiri. */
+  groupId?: string
 }
 
 export interface PengeluaranRecord {
@@ -88,6 +91,9 @@ class CatatMggDB extends Dexie {
     })
     this.version(2).stores({
       appSettings: '++id'
+    })
+    this.version(3).stores({
+      transaksi: '++id, sesiId, selesai, dibatalkan, groupId'
     })
   }
 }
@@ -192,12 +198,18 @@ async function catatAudit(id: number, ringkasan: string): Promise<void> {
   await db.transaksi.update(id, { riwayatEdit: riwayat })
 }
 
-/** Perpanjangan — tambah durasi, TIDAK mengubah waktu mulai. */
-export async function perpanjangDurasi(id: number, tambahMenit: number): Promise<void> {
+/** Perpanjangan — tambah durasi (TIDAK mengubah waktu mulai) dan opsional tambah jumlah bayar. */
+export async function perpanjangDurasi(id: number, tambahMenit: number, tambahBayar = 0): Promise<void> {
   const t = await db.transaksi.get(id)
   if (!t) return
-  await db.transaksi.update(id, { durasiMenit: t.durasiMenit + tambahMenit })
-  await catatAudit(id, `Perpanjangan +${tambahMenit} menit`)
+  const update: Partial<TransaksiRecord> = { durasiMenit: t.durasiMenit + tambahMenit }
+  if (tambahBayar > 0) update.jumlahBayar = t.jumlahBayar + tambahBayar
+  await db.transaksi.update(id, update)
+  const ringkasan =
+    tambahBayar > 0
+      ? `Perpanjangan +${tambahMenit} menit, +Rp${tambahBayar.toLocaleString('id-ID')}`
+      : `Perpanjangan +${tambahMenit} menit`
+  await catatAudit(id, ringkasan)
 }
 
 export interface EditTransaksiInput {
@@ -288,9 +300,72 @@ export async function tutupTransaksi(id: number): Promise<void> {
   await catatAudit(id, 'Transaksi ditutup')
 }
 
+/** Tutup transaksi TANPA menandai lunas — dipakai tombol "Bayar nanti" saat waktu
+ * habis. statusBayar tetap 'belum', nanti ditagih & ditandai lunas dari History. */
+export async function tutupTransaksiBayarNanti(id: number): Promise<void> {
+  await db.transaksi.update(id, { selesai: true, waktuSelesai: new Date().toISOString() })
+  await catatAudit(id, 'Ditutup \u2014 bayar nanti')
+}
+
 /** Batalkan/Hapus — hapus transaksi secara permanen. */
 export async function hapusTransaksi(id: number): Promise<void> {
   await db.transaksi.delete(id)
+}
+
+// ---------- Gabung Pembayaran ----------
+
+/** Semua transaksi 1 sesi selain transaksi ini sendiri, dikelompokkan untuk
+ * ditampilkan di Bottom Sheet pilih timer: aktif -> selesai belum bayar -> selesai
+ * sudah bayar (urutan sesuai spesifikasi). */
+export async function listKandidatGabungPembayaran(
+  sesiId: number,
+  kecualiId: number
+): Promise<{ aktif: TransaksiRecord[]; selesaiBelumBayar: TransaksiRecord[]; selesaiSudahBayar: TransaksiRecord[] }> {
+  const semua = await db.transaksi
+    .where('sesiId')
+    .equals(sesiId)
+    .filter((t) => t.id !== kecualiId && !t.dibatalkan)
+    .toArray()
+  return {
+    aktif: semua.filter((t) => !t.selesai),
+    selesaiBelumBayar: semua.filter((t) => t.selesai && t.statusBayar === 'belum'),
+    selesaiSudahBayar: semua.filter((t) => t.selesai && t.statusBayar === 'sudah')
+  }
+}
+
+/** Gabungkan transaksi utama + daftar transaksi lain jadi 1 groupId yang sama.
+ * Kalau salah satu anggota baru sudah punya groupId lain, anggota grup lama itu
+ * ikut dipindah supaya tidak ada grup yang "terbelah". */
+export async function gabungkanTransaksi(idUtama: number, idLain: number[]): Promise<string> {
+  const utama = await db.transaksi.get(idUtama)
+  const groupId = utama?.groupId ?? crypto.randomUUID()
+  const idIntiSet = new Set<number>([idUtama, ...idLain])
+
+  // Kumpulkan juga anggota grup lama (kalau ada) dari transaksi yang baru dipilih,
+  // supaya semua yang tadinya sudah tergabung tetap ikut serta, bukan tertinggal.
+  for (const id of [...idIntiSet]) {
+    const t = await db.transaksi.get(id)
+    if (t?.groupId) {
+      const anggotaLama = await db.transaksi.where('groupId').equals(t.groupId).toArray()
+      anggotaLama.forEach((a) => a.id && idIntiSet.add(a.id))
+    }
+  }
+
+  await db.transaction('rw', db.transaksi, async () => {
+    for (const id of idIntiSet) {
+      await db.transaksi.update(id, { groupId })
+    }
+  })
+  return groupId
+}
+
+/** Keluarkan 1 transaksi dari grup gabungannya. */
+export async function lepasDariGrup(id: number): Promise<void> {
+  await db.transaksi.update(id, { groupId: undefined })
+}
+
+export async function listAnggotaGrup(groupId: string): Promise<TransaksiRecord[]> {
+  return db.transaksi.where('groupId').equals(groupId).toArray()
 }
 
 // ---------- Master jenis pengeluaran (sesi 5) ----------
