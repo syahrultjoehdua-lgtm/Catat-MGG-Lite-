@@ -227,8 +227,8 @@ export default function Dashboard() {
         />
       )}
 
-      {sheet?.jenis === 'perpanjang' && sheet.t.id && (
-        <PerpanjangSheet id={sheet.t.id} onClose={() => setSheet(null)} />
+      {sheet?.jenis === 'perpanjang' && (
+        <PerpanjangSheet transaksi={sheet.t} onClose={() => setSheet(null)} />
       )}
 
       {sheet?.jenis === 'edit' && <EditSheet transaksi={sheet.t} onClose={() => setSheet(null)} />}

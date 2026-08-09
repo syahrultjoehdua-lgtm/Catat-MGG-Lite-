@@ -65,9 +65,11 @@ catat-mgg-lite/
 │   ├── config.ts              ← Tempat isi APPS_SCRIPT_URL
 │   │
 │   ├── db/
-│   │   └── db.ts               ← SATU file ini isinya: skema Dexie + SEMUA fungsi
-│   │                             baca/tulis data (getOrCreateActiveSession,
-│   │                             tambahSewa, perpanjangDurasi, akhiriSesi, dst.)
+│   │   ├── db.ts               ← SATU file ini isinya: skema Dexie + SEMUA fungsi
+│   │   │                          baca/tulis data (getOrCreateActiveSession,
+│   │   │                          tambahSewa, perpanjangDurasi, akhiriSesi, dst.)
+│   │   └── seed.ts             ← Isi data awal (Master Unit, Jenis Pengeluaran, QR
+│   │                               default) sekali saat app pertama kali dibuka
 │   │
 │   ├── services/
 │   │   └── sync.ts             ← Susun payload & kirim data sesi ke backend + retry

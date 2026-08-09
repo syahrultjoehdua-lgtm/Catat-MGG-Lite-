@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type TransaksiRecord } from '../db/db'
 import { sisaWaktuMs } from '../utils/time'
+import { mulaiKeepAliveAudio, hentikanKeepAliveAudio } from '../utils/alarm'
 import AlarmOverlay from './AlarmOverlay'
 
 /** Watcher alarm level-app — sengaja dipasang di App.tsx (bukan di dalam Dashboard),
@@ -25,6 +26,14 @@ export default function GlobalAlarmWatcher() {
   const transaksiAktifRef = useRef<TransaksiRecord[]>([])
   useEffect(() => {
     transaksiAktifRef.current = transaksiAktif ?? []
+  }, [transaksiAktif])
+
+  useEffect(() => {
+    // Jaga AudioContext tetap 'running' selagi ada minimal 1 transaksi aktif —
+    // mitigasi bug "alarm tidak bunyi sama sekali di iOS" (lihat utils/alarm.ts).
+    // Dimatikan lagi kalau tidak ada transaksi aktif supaya hemat baterai.
+    if (transaksiAktif && transaksiAktif.length > 0) mulaiKeepAliveAudio()
+    else hentikanKeepAliveAudio()
   }, [transaksiAktif])
 
   const [alarmUntuk, setAlarmUntuk] = useState<TransaksiRecord | null>(null)

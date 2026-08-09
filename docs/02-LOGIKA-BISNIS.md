@@ -96,7 +96,7 @@ tap kartu untuk buka sheet "Rincian Sewa" yang berisi semua aksi berikut:
 
 | Aksi | Fungsi di `db.ts` | Catatan |
 |---|---|---|
-| **Perpanjangan** | `perpanjangDurasi(id, tambahMenit, tambahBayar?)` | Menambah `durasiMenit`, **tidak** mengubah `waktuMulai`. Opsional sekalian menambah `jumlahBayar` (mis. pelanggan minta tambah waktu sekaligus bayar tambahan) |
+| **Perpanjangan** | `perpanjangDurasi(id, tambahMenit, tambahBayar?)` | Menambah `durasiMenit`, **tidak** mengubah `waktuMulai`. `PerpanjangSheet` nilai awalnya sengaja 25 menit & Rp15.000 (bisa diubah), field durasi bisa diketik manual (minimal 1 menit), dan menampilkan "Total waktu"/"Total tagihan" real-time (durasi & jumlah bayar transaksi asal + yang ditambahkan) sebelum disimpan. Jumlah bayar tetap opsional — boleh 0 |
 | **Edit** | `editTransaksi(id, patch, now)` | Bisa ubah nama, foto, sisa waktu, jumlah bayar, status bayar, DAN kode unit (lihat poin 2 di atas). Tiap perubahan dicatat ke `riwayatEdit` (audit trail) |
 | **Tukar unit** | `tukarUnit(id, kodeBaru[])` | Ganti kode unit tanpa reset timer. UI-nya **per-slot** (`TukarUnitSheet`): tiap unit lama di transaksi dapat 1 dropdown "Sesudah" sendiri, bukan 1 daftar chip campur — supaya tidak bisa asal pilih banyak unit baru untuk 1 slot lama (lihat `06-RIWAYAT-BUG.md` konteks perbaikannya) |
 | **Jeda** | `jedaTransaksi(id)` | Set `dijeda: true`, catat `waktuJedaMulai` |
@@ -196,13 +196,37 @@ Karena alarm kita dipicu otomatis dari `setInterval` (bukan dari tap
 langsung), `AudioContext` browser diam-diam ditolak bunyi tanpa error yang
 terlihat.
 
-Solusinya (`src/utils/alarm.ts` + `primeAudio()` di `App.tsx`): begitu user
-menyentuh layar app **pertama kali** (event `pointerdown`/`touchstart` apa
-saja), `AudioContext` langsung dibuat & di-*resume* saat itu juga. Karena
-sudah pernah "di-unlock" oleh sentuhan asli, `AudioContext` yang sama boleh
-dipakai lagi belakangan oleh kode otomatis (`setInterval`) tanpa diblokir
-lagi — asal instance `AudioContext`-nya sama (makanya `alarm.ts` pakai satu
-variabel module-level `audioCtx`, bukan bikin baru tiap kali).
+**Perbaikan tahap 1** (`primeAudio()` di `App.tsx`): begitu user menyentuh
+layar app, `AudioContext` dibuat & di-*resume*. Ini cukup untuk kebanyakan
+browser — tapi TIDAK cukup untuk iOS Safari, lihat di bawah.
+
+**Bug lanjutan khusus iOS**: sekalipun sudah pernah di-*unlock*, iOS Safari
+punya kebiasaan **menangguhkan (`suspend`) `AudioContext` lagi** kalau tidak
+ada suara diputar dalam beberapa saat — dan `resume()` yang dipanggil
+belakangan dari kode yang **bukan** dipicu sentuhan langsung (seperti alarm
+dari `setInterval`) sering gagal diam-diam di WebKit. Versi awal kode ini
+juga melepas listener sentuhannya setelah 1x terpakai, jadi tidak ada
+kesempatan re-unlock sama sekali setelah sentuhan pertama — kombinasi 2 hal
+ini yang bikin laporan "tidak bunyi/getar sama sekali" di iOS PWA.
+
+**Perbaikan tahap 2** (2 lapis, lihat `src/utils/alarm.ts` & `App.tsx`):
+1. Listener sentuhan di `App.tsx` sekarang **tidak pernah melepas dirinya
+   sendiri** — tiap sentuhan layar (bukan cuma yang pertama) memanggil
+   `primeAudio()` lagi, memaksimalkan peluang context sudah `'running'` saat
+   alarm betulan perlu bunyi.
+2. `mulaiKeepAliveAudio()` — selagi ada minimal 1 transaksi aktif berjalan
+   (dipantau `GlobalAlarmWatcher`), diputar bunyi nyaris-hening (20Hz, gain
+   ~0, di luar jangkauan dengar) tiap 4 detik — **satu-satunya tujuannya**
+   supaya `AudioContext` tidak pernah sempat idle & ditangguhkan sistem sejak
+   awal. `hentikanKeepAliveAudio()` dipanggil lagi begitu tidak ada transaksi
+   aktif, supaya tidak boros baterai tanpa alasan.
+
+**Soal getar**: iOS Safari (termasuk mode PWA "Add to Home Screen") **tidak
+mengimplementasikan Vibration API sama sekali** — ini keterbatasan resmi dari
+Apple/WebKit, bukan bug yang bisa diperbaiki dari kode web manapun.
+`'vibrate' in navigator` akan selalu `false` di iOS, jadi kode alarm otomatis
+tidak melakukan apa-apa di sana (tidak error, cuma memang tidak bisa
+menggetarkan HP). Di Android, getar tetap berfungsi normal.
 
 ### 7.3 Batasan besar: TIDAK bisa bunyi/muncul saat layar HP benar-benar mati
 
@@ -268,3 +292,42 @@ setelah tekan "Ya, Selesaikan Sesi".
   (`Splash.tsx`) dan saat event `online` browser terpicu (`App.tsx`). Juga
   ada tombol manual "Kirim ulang data sesi" di Settings (cuma muncul kalau
   memang ada sesi berstatus belum terkirim).
+
+## 10. Saldo awal sesi & seed data awal aplikasi
+
+### 10.1 Saldo awal — bisa diatur dari Settings, bukan cuma saat Akhiri Sesi
+
+Sebelumnya, field "Saldo awal" cuma bisa diisi saat proses **Akhiri Sesi**
+(prefill dari `getSaldoAkhirSesiSebelumnya()`). Sekarang alurnya:
+
+1. `getOrCreateActiveSession()` — begitu sesi BARU dibuat (bukan lanjut sesi
+   lama), `saldoAwal`-nya otomatis langsung diisi dari saldo akhir sesi
+   sebelumnya (kalau ada sesi yang pernah ditutup).
+2. Nilai ini bisa dikoreksi manual **kapan saja selama sesi masih berjalan**
+   lewat menu Settings ("Saldo awal") — lewat fungsi `setSaldoAwalSesiAktif()`.
+   Ada juga tombol pintasan "Isi otomatis dari sesi sebelumnya" untuk
+   mengembalikan ke nilai saldo akhir sesi sebelumnya kapan pun.
+3. Layar Akhiri Sesi tetap menampilkan & mengizinkan koreksi field ini di
+   langkah terakhir sebelum sesi resmi ditutup — membaca `sesi.saldoAwal`
+   yang sudah tersimpan (bukan menghitung ulang dari nol).
+
+### 10.2 Seed data awal — Master Unit, Jenis Pengeluaran, QR default
+
+`src/db/seed.ts` (`jalankanSeedAwalJikaPerlu()`, dipanggil sekali dari
+`App.tsx` saat mount) mengisi data awal berikut **HANYA pada saat aplikasi
+pertama kali dibuka/dipasang di 1 device**:
+
+- **Master Unit**: E02, E03, E04, E05, E06, E07, T03, T04, T05, T06, L01,
+  L02, F01
+- **Master Jenis Pengeluaran**: Pajak & Distribusi, Listrik, Konsumsi
+- **QR pembayaran default**: gambar QRIS resmi "Maing Gali Gali"
+  (`src/assets/qr/qris-default.jpg`, dibundel ke dalam aplikasi saat build)
+
+Semua tetap bisa dihapus/diubah/ditambah manual sesudahnya lewat menu
+Settings masing-masing seperti biasa. Ditandai lewat flag
+`seedAwalSelesai` di `appSettings` (BUKAN dicek dari kosongnya tabel) —
+supaya kalau user sengaja menghapus salah satu data bawaan ini nanti, data
+itu **tidak diam-diam muncul lagi** tiap kali app dibuka ulang. Flag ini
+cuma diset `true` di baris paling akhir fungsi, jadi kalau ada 1 langkah
+gagal di tengah (misalnya gagal fetch gambar QR bawaan), seed akan dicoba
+lagi secara utuh di percobaan buka app berikutnya.

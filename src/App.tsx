@@ -11,10 +11,15 @@ import MasterExpenseType from './pages/MasterData/MasterExpenseType'
 import MasterQr from './pages/MasterData/MasterQr'
 import { cobaKirimSemuaSesiBelumTerkirim } from './services/sync'
 import { getAppSettings } from './db/db'
+import { jalankanSeedAwalJikaPerlu } from './db/seed'
 import { primeAudio } from './utils/alarm'
 import GlobalAlarmWatcher from './components/GlobalAlarmWatcher'
 
 export default function App() {
+  useEffect(() => {
+    jalankanSeedAwalJikaPerlu()
+  }, [])
+
   useEffect(() => {
     // Coba kirim ulang begitu koneksi internet kembali (spesifikasi 3.6).
     window.addEventListener('online', cobaKirimSemuaSesiBelumTerkirim)
@@ -22,18 +27,28 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // Unlock AudioContext dari sentuhan pertama user, supaya alarm yang dipicu
-    // otomatis belakangan (bukan dari tap langsung) tetap bisa bunyi.
-    function unlockSekali() {
-      primeAudio()
-      window.removeEventListener('pointerdown', unlockSekali)
-      window.removeEventListener('touchstart', unlockSekali)
+    // Unlock/resume AudioContext di TIAP sentuhan (bukan cuma sentuhan pertama) —
+    // ini perbaikan bug "alarm tidak bunyi sama sekali" di iOS. Sebelumnya listener
+    // ini melepas dirinya sendiri setelah 1x tersentuh, padahal iOS Safari
+    // menangguhkan (suspend) AudioContext lagi setelah beberapa saat tidak
+    // memutar suara — dan resume() yang dipanggil belakangan dari alarm yang
+    // dipicu OTOMATIS oleh timer (bukan dari sentuhan langsung) akan gagal diam-
+    // diam di iOS. Dengan re-unlock di tiap sentuhan, context jauh lebih sering
+    // dalam keadaan "running" saat alarm betulan perlu bunyi. Lihat juga
+    // utils/alarm.ts (mulaiKeepAliveAudio) untuk mitigasi keduanya.
+    window.addEventListener('pointerdown', primeAudio)
+    window.addEventListener('touchstart', primeAudio)
+    // Saat PWA dibuka lagi dari background (mis. user kunci layar lalu buka lagi),
+    // coba unlock ulang juga — walau di iOS resume() di luar sentuhan langsung
+    // tidak selalu berhasil, ini tidak merugikan dan membantu di browser lain.
+    function saatKembaliTerlihat() {
+      if (document.visibilityState === 'visible') primeAudio()
     }
-    window.addEventListener('pointerdown', unlockSekali)
-    window.addEventListener('touchstart', unlockSekali)
+    document.addEventListener('visibilitychange', saatKembaliTerlihat)
     return () => {
-      window.removeEventListener('pointerdown', unlockSekali)
-      window.removeEventListener('touchstart', unlockSekali)
+      window.removeEventListener('pointerdown', primeAudio)
+      window.removeEventListener('touchstart', primeAudio)
+      document.removeEventListener('visibilitychange', saatKembaliTerlihat)
     }
   }, [])
 

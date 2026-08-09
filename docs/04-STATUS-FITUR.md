@@ -16,8 +16,8 @@ Legenda: ✅ Selesai · ⚠️ Selesai dengan catatan · ⏸️ Placeholder/ditu
 | 3.3 Dashboard — daftar kartu unit | ✅ | Diurutkan sisa waktu tersingkat |
 | 3.3 Form Sewa Baru | ✅ | Semua field sesuai (kode unit, nama, foto, durasi, jumlah bayar, status bayar) |
 | 3.3 Transaksi Multi-Unit | ✅ | 1 transaksi/1 timer/1 pembayaran |
-| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan sekarang juga bisa sekalian tambah jumlah bayar (opsional), Tukar Unit sekarang per-slot (Sebelum/Sesudah per unit, bukan 1 daftar chip campur) |
-| 3.3 Alarm waktu habis (foreground vs background) | ⚠️ | Foreground: kartu merah + badge berkedip ✅. Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §7.3 dan `05-RENCANA-LANJUTAN.md` |
+| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan: nilai awal 25 menit & Rp15.000, durasi bisa diketik manual (minimal 1 menit), ada ringkasan "Total waktu"/"Total tagihan" real-time. Tukar Unit sekarang per-slot (Sebelum/Sesudah per unit, bukan 1 daftar chip campur) |
+| 3.3 Alarm waktu habis (foreground vs background) | ✅ | Foreground: kartu merah + badge berkedip + bunyi + wake lock ✅ — termasuk perbaikan bug "diam total di iOS" (keep-alive audio + re-unlock tiap sentuhan, lihat `06-RIWAYAT-BUG.md` Bug #9). Getar: berfungsi di Android, **tidak bisa** di iOS (Vibration API tidak diimplementasi WebKit — keterbatasan platform, bukan bug). Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §7.3 |
 | 3.3 Alur bayar QR saat waktu habis | ✅ | Plus ditambah: bisa dipicu manual ("Bayar sekarang") tanpa harus nunggu waktu habis; plus opsi "Bayar nanti" (tutup transaksi tanpa bayar dulu, ditagih & ditandai lunas belakangan dari History) |
 | 3.4 History | ✅ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI). Tap kartu membuka Rincian Sewa versi History (`HistoryRincianSheet`), header menampilkan sub-total uang masuk sesuai tab aktif, bug tab bar ikut ter-scroll sudah diperbaiki (`position: sticky`) |
 | 3.5 Master Data (Unit, Jenis Pengeluaran, QR) | ✅ | Semua CRUD lengkap |
@@ -57,6 +57,17 @@ selama pengembangan:
   sheet sekarang dirender lewat React portal ke `document.body`
   (`src/utils/portal.tsx`), bukan lagi bersarang di `.app-content` — lihat
   `06-RIWAYAT-BUG.md` Bug #8
+- **Saldo awal bisa diatur dari Settings** — otomatis terisi dari saldo akhir
+  sesi sebelumnya saat sesi baru mulai, bisa dikoreksi manual kapan saja
+  lewat Settings (bukan cuma saat Akhiri Sesi) — lihat `02-LOGIKA-BISNIS.md`
+  §10.1
+- **Seed data awal aplikasi** — Master Unit (13 kode), Master Jenis
+  Pengeluaran (3 jenis), dan QR pembayaran default (gambar QRIS resmi)
+  otomatis terisi sekali saat app pertama kali dibuka, tetap bisa
+  dihapus/diubah manual — lihat `02-LOGIKA-BISNIS.md` §10.2
+- **Perbaikan bug "alarm diam total di iOS PWA"** — keep-alive audio +
+  re-unlock AudioContext di tiap sentuhan, lihat `06-RIWAYAT-BUG.md` Bug #9.
+  Getar tetap tidak bisa di iOS (keterbatasan platform WebKit, bukan bug)
 
 ## Session log (untuk konteks historis)
 

@@ -1,13 +1,40 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
-import { getAppSettings, listSesiBelumTerkirim, setAppSettings } from '../db/db'
+import {
+  getAppSettings,
+  listSesiBelumTerkirim,
+  setAppSettings,
+  getOrCreateActiveSession,
+  setSaldoAwalSesiAktif,
+  getSaldoAkhirSesiSebelumnya
+} from '../db/db'
 import { cobaKirimSemuaSesiBelumTerkirim } from '../services/sync'
 import { mulaiAlarm, hentikanAlarm } from '../utils/alarm'
+import { formatRibuan, parseRibuan } from '../utils/format'
 
 export default function Settings() {
   const belumTerkirim = useLiveQuery(() => listSesiBelumTerkirim(), []) ?? []
   const pengaturan = useLiveQuery(() => getAppSettings(), [])
+  const sesiAktif = useLiveQuery(() => getOrCreateActiveSession(), [])
+  const [saldoAwalInput, setSaldoAwalInput] = useState<number | null>(null)
+  const [saldoSebelumnya, setSaldoSebelumnya] = useState<number | null>(null)
+
+  useEffect(() => {
+    getSaldoAkhirSesiSebelumnya().then(setSaldoSebelumnya)
+  }, [])
+
+  // Sinkron dari DB ke input, tapi cuma kalau user belum sedang mengetik nilai
+  // baru sendiri (supaya live query lain tidak menimpa ketikan yang sedang jalan).
+  useEffect(() => {
+    if (sesiAktif && saldoAwalInput === null) setSaldoAwalInput(sesiAktif.saldoAwal ?? 0)
+  }, [sesiAktif, saldoAwalInput])
+
+  async function simpanSaldoAwal(nilai: number) {
+    setSaldoAwalInput(nilai)
+    await setSaldoAwalSesiAktif(nilai)
+  }
 
   function cobaBunyi(volume: number, getarAktif: boolean) {
     mulaiAlarm({ volume, getarAktif })
@@ -28,6 +55,26 @@ export default function Settings() {
           <span>&rsaquo;</span>
         </div>
       )}
+
+      <p className="settings-section-label">Sesi berjalan</p>
+      <div className="field" style={{ margin: '0 16px 16px' }}>
+        <p className="field-label">Saldo awal</p>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={formatRibuan(saldoAwalInput ?? 0)}
+          onChange={(e) => simpanSaldoAwal(parseRibuan(e.target.value))}
+        />
+        <p className="field-hint">
+          Otomatis terisi dari saldo akhir sesi sebelumnya begitu sesi baru mulai — bisa diubah manual kapan
+          saja sebelum sesi ini diakhiri.
+        </p>
+        {saldoSebelumnya !== null && (
+          <button style={{ marginTop: 8 }} onClick={() => simpanSaldoAwal(saldoSebelumnya)}>
+            Isi otomatis dari sesi sebelumnya (Rp{formatRibuan(saldoSebelumnya)})
+          </button>
+        )}
+      </div>
 
       <p className="settings-section-label">Master data</p>
       <Link className="settings-menu-item" to="/settings/units">

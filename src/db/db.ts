@@ -68,6 +68,11 @@ export interface AppSettingsRecord {
   volumeAlarm: number // 0-1
   getarAktif: boolean
   temaGelap: boolean
+  /** Sudah pernah dijalankan seed data awal (unit, jenis pengeluaran, QR default)?
+   * Dicek sekali saat app pertama kali dibuka — lihat src/db/seed.ts. Sengaja
+   * TIDAK dicek ulang dari kosongnya tabel, supaya data yang sengaja dihapus user
+   * tidak terus muncul lagi tiap buka app. */
+  seedAwalSelesai?: boolean
 }
 
 class CatatMggDB extends Dexie {
@@ -102,14 +107,29 @@ export const db = new CatatMggDB()
 
 // ---------- Sesi ----------
 
-/** Lanjutkan sesi yang belum diakhiri (closedAt kosong), atau buat sesi baru otomatis. */
+/** Lanjutkan sesi yang belum diakhiri (closedAt kosong), atau buat sesi baru otomatis.
+ * Sesi baru otomatis diisi `saldoAwal` dari saldo akhir sesi sebelumnya (kalau ada) —
+ * bisa diubah manual lewat Settings ("Saldo awal") kapan saja sebelum sesi ditutup. */
 export async function getOrCreateActiveSession(): Promise<SesiRecord> {
   const semuaSesi = await db.sesi.toArray()
   const aktif = semuaSesi.find((s) => !s.closedAt)
   if (aktif) return aktif
 
-  const id = await db.sesi.add({ startedAt: new Date().toISOString(), closedAt: null })
+  const saldoSebelumnya = await getSaldoAkhirSesiSebelumnya()
+  const id = await db.sesi.add({
+    startedAt: new Date().toISOString(),
+    closedAt: null,
+    saldoAwal: saldoSebelumnya ?? undefined
+  })
   return (await db.sesi.get(id))!
+}
+
+/** Ubah saldo awal sesi yang sedang aktif — dipakai dari menu Settings, supaya
+ * tidak harus menunggu sampai layar Akhiri Sesi untuk mengoreksinya. */
+export async function setSaldoAwalSesiAktif(nilai: number): Promise<void> {
+  const s = await getOrCreateActiveSession()
+  if (!s.id) return
+  await db.sesi.update(s.id, { saldoAwal: nilai })
 }
 
 // ---------- Unit master & ketersediaan ----------

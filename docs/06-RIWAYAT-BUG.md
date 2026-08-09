@@ -338,6 +338,57 @@ otak-atik angka z-index.
 
 ---
 
+## Bug #9 — iOS PWA: alarm tidak bunyi/getar sama sekali
+
+**Ditemukan saat**: pengujian nyata di iOS PWA (setelah Bug #8 diperbaiki).
+
+**Gejala**: saat waktu habis, `AlarmOverlay` tetap muncul (visual OK) tapi
+**tidak ada bunyi maupun getar sama sekali** — bukan cuma pelan, betul-betul
+diam total.
+
+**Akar masalah (2 hal terpisah, digabung jadi 1 laporan)**:
+
+1. **Bunyi**: `primeAudio()` (unlock `AudioContext` dari sentuhan pertama
+   user) di versi sebelumnya memakai listener yang **melepas dirinya sendiri
+   setelah 1x terpakai**. Ini cukup untuk kebanyakan browser, tapi TIDAK
+   cukup untuk iOS Safari — WebKit dikenal suka menangguhkan (`suspend`)
+   `AudioContext` lagi kalau tidak ada suara diputar dalam beberapa saat.
+   Karena listener sudah lepas, tidak ada kesempatan re-unlock lagi setelah
+   context tertangguh — dan `resume()` yang dipanggil dari alarm (dipicu
+   `setInterval`, bukan sentuhan langsung) gagal diam-diam di WebKit.
+2. **Getar**: iOS Safari **tidak mengimplementasikan Vibration API sama
+   sekali**, di browser tab maupun mode PWA "Add to Home Screen" sekalipun.
+   Ini bukan bug — `'vibrate' in navigator` memang selalu `false` di iOS,
+   jadi ini keterbatasan platform dari Apple, tidak ada workaround dari
+   kode web murni.
+
+**Perbaikan**:
+- Listener sentuhan di `App.tsx` sekarang permanen (tidak melepas diri),
+  memanggil `primeAudio()` di **setiap** sentuhan sepanjang app dipakai.
+- Ditambahkan `mulaiKeepAliveAudio()` di `src/utils/alarm.ts` — bunyi
+  nyaris-hening (20Hz, di luar jangkauan dengar, gain ~0) tiap 4 detik
+  selagi ada minimal 1 transaksi aktif, supaya `AudioContext` tidak pernah
+  sempat idle & ditangguhkan sistem sejak awal. Dikendalikan dari
+  `GlobalAlarmWatcher` berdasarkan ada-tidaknya transaksi aktif.
+- `beepSekali()` sekarang benar-benar menunggu (`await`) `ctx.resume()`
+  selesai dulu sebelum memutar oscillator, bukan menembak `osc.start()`
+  langsung tanpa menunggu context selesai resume (race condition kecil yang
+  bisa bikin suara pertama hilang di browser yang lebih ketat seperti
+  WebKit).
+- Getar: **tidak diperbaiki karena memang tidak bisa** — didokumentasikan
+  dengan jelas di komentar kode & di sini supaya tidak dikira bug lagi di
+  masa depan. Getar tetap berfungsi normal di Android.
+
+**Pelajaran**: kalau alarm/notifikasi berbasis Web Audio API "kadang bunyi
+kadang tidak" khusus di iOS Safari, curigai dulu apakah `AudioContext`
+sempat idle terlalu lama sebelum dipicu — WebKit menangguhkannya lebih
+agresif dari browser lain. Solusi paling andal bukan "unlock sekali di
+awal", tapi **jaga context tetap aktif terus-menerus** selama fitur itu
+relevan dipakai (di sini: selama ada transaksi aktif yang bisa habis waktu
+sewaktu-waktu).
+
+---
+
 ## Ringkasan pola yang berulang
 
 Kalau dilihat lagi, sebagian besar bug di atas berasal dari 3 sumber

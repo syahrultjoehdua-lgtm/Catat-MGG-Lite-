@@ -48,14 +48,13 @@ export default function AkhiriSesi() {
       const s = await getOrCreateActiveSession()
       setSesi(s)
       if (!s.id) return
-      const [p, saldoSebelumnya, transaksiAktif, semuaTransaksi] = await Promise.all([
+      const [p, transaksiAktif, semuaTransaksi] = await Promise.all([
         hitungPendapatanSesi(s.id),
-        getSaldoAkhirSesiSebelumnya(),
         db.transaksi.where('sesiId').equals(s.id).filter((t) => !t.selesai && !t.dibatalkan).toArray(),
         listTransaksiSesi(s.id)
       ])
       setPendapatan(p)
-      setSaldoAwal(saldoSebelumnya ?? 0)
+      setSaldoAwal(s.saldoAwal ?? (await getSaldoAkhirSesiSebelumnya()) ?? 0)
       setJumlahUnitAktif(transaksiAktif.length)
       setJumlahUnitDisewa(semuaTransaksi.filter((t) => !t.dibatalkan).reduce((n, t) => n + t.kodeUnit.length, 0))
       const transaksiDihitung = semuaTransaksi.filter((t) => !t.dibatalkan)
