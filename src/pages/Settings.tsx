@@ -18,22 +18,31 @@ export default function Settings() {
   const belumTerkirim = useLiveQuery(() => listSesiBelumTerkirim(), []) ?? []
   const pengaturan = useLiveQuery(() => getAppSettings(), [])
   const sesiAktif = useLiveQuery(() => getOrCreateActiveSession(), [])
-  const [saldoAwalInput, setSaldoAwalInput] = useState<number | null>(null)
+  const [saldoAwalDraft, setSaldoAwalDraft] = useState<number | null>(null)
   const [saldoSebelumnya, setSaldoSebelumnya] = useState<number | null>(null)
+  const [statusSimpanSaldo, setStatusSimpanSaldo] = useState<'idle' | 'menyimpan' | 'tersimpan'>('idle')
 
   useEffect(() => {
     getSaldoAkhirSesiSebelumnya().then(setSaldoSebelumnya)
   }, [])
 
-  // Sinkron dari DB ke input, tapi cuma kalau user belum sedang mengetik nilai
-  // baru sendiri (supaya live query lain tidak menimpa ketikan yang sedang jalan).
+  // Sinkron dari DB ke draft, tapi cuma kalau draft belum pernah disentuh user
+  // (supaya live query lain tidak menimpa ketikan yang belum disimpan).
   useEffect(() => {
-    if (sesiAktif && saldoAwalInput === null) setSaldoAwalInput(sesiAktif.saldoAwal ?? 0)
-  }, [sesiAktif, saldoAwalInput])
+    if (sesiAktif && saldoAwalDraft === null) setSaldoAwalDraft(sesiAktif.saldoAwal ?? 0)
+  }, [sesiAktif, saldoAwalDraft])
 
-  async function simpanSaldoAwal(nilai: number) {
-    setSaldoAwalInput(nilai)
-    await setSaldoAwalSesiAktif(nilai)
+  const saldoTersimpan = sesiAktif?.saldoAwal ?? 0
+  const saldoBelumDisimpan = saldoAwalDraft !== null && saldoAwalDraft !== saldoTersimpan
+
+  // Sengaja TIDAK auto-save tiap ketik — user diminta menekan tombol "Simpan"
+  // sendiri, supaya salah ketik tidak langsung tersimpan ke sesi aktif.
+  async function simpanSaldoAwal() {
+    if (saldoAwalDraft === null) return
+    setStatusSimpanSaldo('menyimpan')
+    await setSaldoAwalSesiAktif(saldoAwalDraft)
+    setStatusSimpanSaldo('tersimpan')
+    setTimeout(() => setStatusSimpanSaldo('idle'), 1500)
   }
 
   function cobaBunyi(volume: number, getarAktif: boolean) {
@@ -62,18 +71,26 @@ export default function Settings() {
         <input
           type="text"
           inputMode="numeric"
-          value={formatRibuan(saldoAwalInput ?? 0)}
-          onChange={(e) => simpanSaldoAwal(parseRibuan(e.target.value))}
+          value={formatRibuan(saldoAwalDraft ?? 0)}
+          onChange={(e) => setSaldoAwalDraft(parseRibuan(e.target.value))}
         />
         <p className="field-hint">
           Otomatis terisi dari saldo akhir sesi sebelumnya begitu sesi baru mulai — bisa diubah manual kapan
-          saja sebelum sesi ini diakhiri.
+          saja sebelum sesi ini diakhiri. Jangan lupa ketuk "Simpan" setelah mengetik.
         </p>
         {saldoSebelumnya !== null && (
-          <button style={{ marginTop: 8 }} onClick={() => simpanSaldoAwal(saldoSebelumnya)}>
+          <button style={{ marginTop: 8 }} onClick={() => setSaldoAwalDraft(saldoSebelumnya)}>
             Isi otomatis dari sesi sebelumnya (Rp{formatRibuan(saldoSebelumnya)})
           </button>
         )}
+        <button
+          className="fab"
+          style={{ width: '100%', marginTop: 8 }}
+          onClick={simpanSaldoAwal}
+          disabled={!saldoBelumDisimpan || statusSimpanSaldo === 'menyimpan'}
+        >
+          {statusSimpanSaldo === 'menyimpan' ? 'Menyimpan...' : statusSimpanSaldo === 'tersimpan' ? 'Tersimpan \u2713' : 'Simpan saldo awal'}
+        </button>
       </div>
 
       <p className="settings-section-label">Master data</p>

@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell'
 import EditSheet from '../components/EditSheet'
 import HistoryRincianSheet from '../components/HistoryRincianSheet'
 import { db, listPengeluaranSesi, type TransaksiRecord } from '../db/db'
+import { formatDurasi } from '../utils/durasi'
 import { buatGambarLaporanSesi, bagikanAtauUnduhGambar, type DataLaporanSesi } from '../utils/laporanGambar'
 
 function formatJam(iso?: string) {
@@ -26,7 +27,7 @@ function BarisTransaksi({ t, onTap }: { t: TransaksiRecord; onTap: () => void })
         <span className="history-row-bayar">Rp{t.jumlahBayar.toLocaleString('id-ID')}</span>
       </div>
       <p className="field-hint">
-        {formatJam(t.waktuMulai)} &rarr; {formatJam(t.waktuSelesai)} &middot; {t.durasiMenit} menit
+        {formatJam(t.waktuMulai)} &rarr; {formatJam(t.waktuSelesai)} &middot; {formatDurasi(t.durasiMenit)}
       </p>
       <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
         {bayarNanti && <span className="badge badge-warning">Bayar nanti</span>}
@@ -65,6 +66,13 @@ export default function History() {
     return db.transaksi.where('sesiId').equals(sesiAktif.id).filter((t) => !!t.selesai).toArray()
   }, [sesiAktif?.id])
 
+  // SEMUA transaksi sesi aktif (aktif maupun selesai) — dipakai khusus untuk
+  // hitung ringkasan "unit selesai vs unit belum", bukan untuk daftar baris.
+  const semuaTransaksiSesiAktif = useLiveQuery(async () => {
+    if (!sesiAktif?.id) return []
+    return db.transaksi.where('sesiId').equals(sesiAktif.id).filter((t) => !t.dibatalkan).toArray()
+  }, [sesiAktif?.id])
+
   const kelompokSelesai = useLiveQuery(async () => {
     const sesiSelesai = (await db.sesi.toArray())
       .filter((s) => s.closedAt)
@@ -101,15 +109,29 @@ export default function History() {
     return [...transaksiSesiAktif].sort((a, b) => new Date(b.waktuMulai).getTime() - new Date(a.waktuMulai).getTime())
   }, [transaksiSesiAktif])
 
-  // Sub-total uang masuk untuk tab yang sedang dilihat, ditampilkan di header.
-  const subtotal = useMemo(() => {
-    if (tab === 'aktif') return terurutAktif.reduce((s, t) => s + t.jumlahBayar, 0)
-    if (!kelompokSelesai) return 0
-    return kelompokSelesai.reduce((s, g) => s + g.transaksi.reduce((s2, t) => s2 + t.jumlahBayar, 0), 0)
-  }, [tab, terurutAktif, kelompokSelesai])
+  // Ringkasan untuk tab yang sedang dilihat: berapa unit sudah selesai vs masih
+  // berjalan, berapa pendapatan yang sudah masuk vs masih belum dibayar, dan
+  // total keseluruhan (masuk + belum dibayar).
+  const ringkasan = useMemo(() => {
+    const kosong = { unitSelesai: 0, unitBelumSelesai: 0, pendapatanMasuk: 0, pendapatanBelumDibayar: 0, totalPendapatan: 0 }
+    const sumberTransaksi: TransaksiRecord[] =
+      tab === 'aktif' ? semuaTransaksiSesiAktif ?? [] : kelompokSelesai?.flatMap((g) => g.transaksi) ?? []
+
+    return sumberTransaksi.reduce((acc, t) => {
+      const jumlahUnit = t.kodeUnit.length
+      if (t.selesai) acc.unitSelesai += jumlahUnit
+      else acc.unitBelumSelesai += jumlahUnit
+
+      if (t.statusBayar === 'sudah') acc.pendapatanMasuk += t.jumlahBayar
+      else acc.pendapatanBelumDibayar += t.jumlahBayar
+
+      acc.totalPendapatan += t.jumlahBayar
+      return acc
+    }, kosong)
+  }, [tab, semuaTransaksiSesiAktif, kelompokSelesai])
 
   return (
-    <AppShell title="Riwayat" subtitle={`Total masuk ${tab === 'aktif' ? 'sesi ini' : 'semua sesi selesai'}: ${rupiah(subtotal)}`}>
+    <AppShell title="Riwayat" subtitle={`Total pendapatan: ${rupiah(ringkasan.totalPendapatan)}`}>
       <div className="tab-row tab-row-sticky">
         <button className={tab === 'aktif' ? 'tab-item tab-item-active' : 'tab-item'} onClick={() => setTab('aktif')}>
           Sesi aktif
@@ -117,6 +139,29 @@ export default function History() {
         <button className={tab === 'selesai' ? 'tab-item tab-item-active' : 'tab-item'} onClick={() => setTab('selesai')}>
           Sesi selesai
         </button>
+      </div>
+
+      <div className="card ringkasan-mini-grid">
+        <div className="ringkasan-mini-item">
+          <p className="ringkasan-mini-label">Unit selesai</p>
+          <p className="ringkasan-mini-nilai">{ringkasan.unitSelesai}</p>
+        </div>
+        <div className="ringkasan-mini-item">
+          <p className="ringkasan-mini-label">Unit masih berjalan</p>
+          <p className="ringkasan-mini-nilai">{ringkasan.unitBelumSelesai}</p>
+        </div>
+        <div className="ringkasan-mini-item">
+          <p className="ringkasan-mini-label">Pendapatan masuk</p>
+          <p className="ringkasan-mini-nilai">{rupiah(ringkasan.pendapatanMasuk)}</p>
+        </div>
+        <div className="ringkasan-mini-item">
+          <p className="ringkasan-mini-label">Belum dibayar</p>
+          <p className="ringkasan-mini-nilai">{rupiah(ringkasan.pendapatanBelumDibayar)}</p>
+        </div>
+        <div className="ringkasan-mini-item ringkasan-mini-total">
+          <p className="ringkasan-mini-label">Total pendapatan</p>
+          <p className="ringkasan-mini-nilai">{rupiah(ringkasan.totalPendapatan)}</p>
+        </div>
       </div>
 
       {tab === 'aktif' ? (
@@ -152,6 +197,8 @@ export default function History() {
                       tanggalSesi: grup.closedAt,
                       saldoAwal: grup.saldoAwal ?? 0,
                       pendapatan: grup.transaksi.reduce((s, t) => s + t.jumlahBayar, 0),
+                      pendapatanTunai: grup.transaksi.filter((t) => !t.nonTunai).reduce((s, t) => s + t.jumlahBayar, 0),
+                      pendapatanNonTunai: grup.transaksi.filter((t) => t.nonTunai).reduce((s, t) => s + t.jumlahBayar, 0),
                       pengeluaran: grup.pengeluaran,
                       saldoAkhir: grup.saldoAkhir ?? 0,
                       jumlahUnitDisewa: grup.transaksi.reduce((s, t) => s + t.kodeUnit.length, 0)

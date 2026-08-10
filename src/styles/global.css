@@ -1,11 +1,12 @@
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; overflow: hidden; }
+html, body, #root { height: 100%; overflow: hidden; touch-action: manipulation; }
 body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 h1, h2, h3, p { margin: 0; }
 button {
@@ -64,6 +65,7 @@ input {
   padding: 0 20px 24px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 .app-content-with-header { padding-top: 82px; }
 .app-content-with-nav { padding-bottom: calc(80px + var(--safe-bottom)); }
@@ -437,6 +439,17 @@ input {
 .pengeluaran-row button { padding: 8px 10px; }
 .ringkasan-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--color-text-secondary); padding: 4px 0; }
 .ringkasan-row-total { font-size: 16px; font-weight: 500; color: var(--color-text-primary); border-top: 0.5px solid var(--color-border); margin-top: 4px; padding-top: 10px; }
+
+.ringkasan-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.ringkasan-mini-item { min-width: 0; }
+.ringkasan-mini-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 2px; }
+.ringkasan-mini-nilai { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
+.ringkasan-mini-total {
+  grid-column: 1 / -1;
+  border-top: 0.5px solid var(--color-border);
+  padding-top: 10px;
+}
+.ringkasan-mini-total .ringkasan-mini-nilai { font-size: 19px; font-weight: 600; color: var(--color-accent); }
 .sync-badge { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--color-warning-soft); color: var(--color-warning); }
 
 .selesai-check {
@@ -497,6 +510,7 @@ input {
   max-width: 480px;
   max-height: 88vh;
   overflow-y: auto;
+  touch-action: pan-y;
   background: var(--color-bg);
   border-radius: 24px 24px 0 0;
   padding: 20px 20px calc(20px + var(--safe-bottom));
@@ -591,6 +605,10 @@ input {
   text-align: center;
 }
 .tukar-unit-arrow { color: var(--color-text-muted); padding-bottom: 10px; flex-shrink: 0; }
+
+.durasi-row { display: flex; gap: 8px; }
+.durasi-col { flex: 1; min-width: 0; }
+.durasi-caption { text-align: center; font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .toggle-btn-active-success { background: var(--color-success-soft); color: var(--color-success); border-color: var(--color-success); }

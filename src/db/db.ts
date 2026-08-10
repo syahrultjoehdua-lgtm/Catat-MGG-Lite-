@@ -3,6 +3,7 @@
 // semua query & logika di sini berjalan 100% lokal.
 
 import Dexie, { type Table } from 'dexie'
+import { bulatkanKeDetik, formatDurasi } from '../utils/durasi'
 
 export interface SesiRecord {
   id?: number
@@ -222,13 +223,13 @@ async function catatAudit(id: number, ringkasan: string): Promise<void> {
 export async function perpanjangDurasi(id: number, tambahMenit: number, tambahBayar = 0): Promise<void> {
   const t = await db.transaksi.get(id)
   if (!t) return
-  const update: Partial<TransaksiRecord> = { durasiMenit: t.durasiMenit + tambahMenit }
+  const update: Partial<TransaksiRecord> = { durasiMenit: bulatkanKeDetik(t.durasiMenit + tambahMenit) }
   if (tambahBayar > 0) update.jumlahBayar = t.jumlahBayar + tambahBayar
   await db.transaksi.update(id, update)
   const ringkasan =
     tambahBayar > 0
-      ? `Perpanjangan +${tambahMenit} menit, +Rp${tambahBayar.toLocaleString('id-ID')}`
-      : `Perpanjangan +${tambahMenit} menit`
+      ? `Perpanjangan +${formatDurasi(tambahMenit)}, +Rp${tambahBayar.toLocaleString('id-ID')}`
+      : `Perpanjangan +${formatDurasi(tambahMenit)}`
   await catatAudit(id, ringkasan)
 }
 
@@ -268,8 +269,10 @@ export async function editTransaksi(id: number, patch: EditTransaksiInput, now: 
   if (patch.sisaMenitBaru !== undefined) {
     const mulai = new Date(t.waktuMulai).getTime()
     const jedaMs = (t.totalMenitJeda ?? 0) * 60_000
-    const elapsedMenit = Math.max(0, (now - mulai - jedaMs) / 60_000)
-    const durasiBaru = Math.max(1, Math.round(elapsedMenit + patch.sisaMenitBaru))
+    const elapsedDetik = Math.max(0, (now - mulai - jedaMs) / 1000)
+    const sisaDetikBaru = Math.max(0, patch.sisaMenitBaru) * 60
+    const totalDetikBaru = Math.round(elapsedDetik + sisaDetikBaru)
+    const durasiBaru = totalDetikBaru / 60
     if (durasiBaru !== t.durasiMenit) {
       update.durasiMenit = durasiBaru
       perubahan.push('sisa waktu')

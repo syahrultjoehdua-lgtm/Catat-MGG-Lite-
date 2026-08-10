@@ -96,6 +96,7 @@ catat-mgg-lite/
 │   │   ├── EditSheet.tsx         ← Form edit transaksi
 │   │   ├── PerpanjangSheet.tsx
 │   │   ├── TukarUnitSheet.tsx    ← Tukar unit per-slot (Sebelum/Sesudah)
+│   │   ├── DurasiStepper.tsx     ← Stepper menit+detik bersama (Tambah/Perpanjang/Edit)
 │   │   ├── PembayaranQrSheet.tsx ← Termasuk opsi "Bayar nanti"
 │   │   ├── FullQrView.tsx        ← QR full-screen
 │   │   ├── GabungPembayaranSheet.tsx   ← Pilih timer lain untuk digabung
@@ -107,6 +108,7 @@ catat-mgg-lite/
 │   ├── utils/
 │   │   ├── time.ts               ← Hitung sisa waktu, warna ring, dll
 │   │   ├── format.ts             ← Format angka jadi "Rp15.000"
+│   │   ├── durasi.ts             ← Konversi/format durasi menit+detik, langkah stepper pintar
 │   │   ├── portal.tsx            ← Helper createPortal(node, document.body) — dipakai semua bottom sheet, perbaikan bug iOS (lihat 06-RIWAYAT-BUG.md Bug #8)
 │   │   ├── alarm.ts              ← Bunyi (Web Audio API) + getar + wake lock
 │   │   └── laporanGambar.ts      ← Generate gambar ringkasan sesi (Canvas)

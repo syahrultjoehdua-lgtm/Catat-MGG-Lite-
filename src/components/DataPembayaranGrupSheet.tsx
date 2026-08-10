@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { TransaksiRecord } from '../db/db'
 import { listAnggotaGrup, tandaiSudahDibayar } from '../db/db'
+import { formatDurasi } from '../utils/durasi'
 import { toBody } from '../utils/portal'
 
 interface DataPembayaranGrupSheetProps {
@@ -67,7 +68,7 @@ export default function DataPembayaranGrupSheet({ groupId, onClose }: DataPembay
                   <div key={t.id} className="card" style={{ padding: 12 }}>
                     <div className="rincian-row" style={{ padding: '0 0 4px' }}>
                       <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{t.kodeUnit.join(', ')}</span>
-                      <span>{t.durasiMenit} menit</span>
+                      <span>{formatDurasi(t.durasiMenit)}</span>
                     </div>
                     <div className="rincian-row" style={{ padding: '0 0 8px', borderBottom: 'none' }}>
                       <span>{t.namaPelanggan || '\u2013'}</span>

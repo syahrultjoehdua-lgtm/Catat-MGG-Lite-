@@ -2,6 +2,8 @@ export interface DataLaporanSesi {
   tanggalSesi: string // ISO
   saldoAwal: number
   pendapatan: number
+  pendapatanTunai: number
+  pendapatanNonTunai: number
   pengeluaran: number
   saldoAkhir: number
   jumlahUnitDisewa: number
@@ -17,7 +19,7 @@ export async function buatGambarLaporanSesi(data: DataLaporanSesi): Promise<Blob
   await document.fonts?.ready?.catch(() => {})
 
   const W = 720
-  const H = 960
+  const H = 1040
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
@@ -77,8 +79,25 @@ export async function buatGambarLaporanSesi(data: DataLaporanSesi): Promise<Blob
     ctx.stroke()
   }
 
+  // Baris kecil tanpa garis pemisah sendiri — dipakai untuk rincian di bawah
+  // baris utama, mis. pecahan Tunai/Non-tunai di bawah "Pendapatan".
+  const subBaris = (label: string, nilai: string) => {
+    ctx.fillStyle = abu
+    ctx.font = '400 16px Poppins, sans-serif'
+    ctx.fillText(`   ${label}`, 48, y)
+    ctx.font = '500 16px Poppins, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillText(nilai, W - 48, y)
+    ctx.textAlign = 'left'
+    y += 32
+  }
+
   baris('Saldo awal', rupiah(data.saldoAwal))
   baris('Pendapatan', rupiah(data.pendapatan))
+  y -= 10
+  subBaris('Tunai', rupiah(data.pendapatanTunai))
+  subBaris('Non-tunai', rupiah(data.pendapatanNonTunai))
+  y += 8
   baris('Pengeluaran', `-${rupiah(data.pengeluaran)}`)
   y += 10
   baris('Saldo akhir', rupiah(data.saldoAkhir), true)

@@ -98,6 +98,8 @@ export default function AkhiriSesi() {
         tanggalSesi: tanggalSesiSelesai,
         saldoAwal,
         pendapatan,
+        pendapatanTunai,
+        pendapatanNonTunai,
         pengeluaran: totalPengeluaran,
         saldoAkhir,
         jumlahUnitDisewa

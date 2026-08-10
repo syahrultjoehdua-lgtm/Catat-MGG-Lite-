@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { TransaksiRecord } from '../db/db'
 import { tandaiSudahDibayar } from '../db/db'
+import { formatDurasi } from '../utils/durasi'
 import { toBody } from '../utils/portal'
 import { IconEdit, IconCheck } from './icons'
 
@@ -49,7 +50,7 @@ export default function HistoryRincianSheet({ transaksi, onClose, onEdit }: Hist
           <div className="rincian-row"><span>Nama pelanggan</span><span>{transaksi.namaPelanggan || '\u2013'}</span></div>
           <div className="rincian-row"><span>Waktu mulai</span><span>{formatJam(transaksi.waktuMulai)}</span></div>
           <div className="rincian-row"><span>Waktu selesai</span><span>{formatJam(transaksi.waktuSelesai)}</span></div>
-          <div className="rincian-row"><span>Durasi</span><span>{transaksi.durasiMenit} menit</span></div>
+          <div className="rincian-row"><span>Durasi</span><span>{formatDurasi(transaksi.durasiMenit)}</span></div>
           <div className="rincian-row"><span>Jumlah bayar</span><span>{rupiah(transaksi.jumlahBayar)}</span></div>
           <div className="rincian-row">
             <span>Status bayar</span>

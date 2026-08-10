@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { tambahSewa, type UnitMaster } from '../db/db'
 import { IconCamera } from './icons'
 import { formatRibuan, parseRibuan } from '../utils/format'
+import { gabungMenitDetik } from '../utils/durasi'
+import DurasiStepper from './DurasiStepper'
 import { toBody } from '../utils/portal'
 
 interface TambahSewaSheetProps {
@@ -13,7 +15,6 @@ interface TambahSewaSheetProps {
 }
 
 const DURASI_DEFAULT = 25
-const DURASI_LANGKAH = 5
 const BAYAR_DEFAULT = 15000
 const BAYAR_LANGKAH = 5000
 
@@ -21,7 +22,8 @@ export default function TambahSewaSheet({ sesiId, unitTersedia, riwayatNama, onC
   const [kodeTerpilih, setKodeTerpilih] = useState<string[]>([])
   const [namaPelanggan, setNamaPelanggan] = useState('')
   const [fotoFile, setFotoFile] = useState<File | null>(null)
-  const [durasi, setDurasi] = useState(DURASI_DEFAULT)
+  const [durasiMenit, setDurasiMenit] = useState(DURASI_DEFAULT)
+  const [durasiDetik, setDurasiDetik] = useState(0)
   const [jumlahBayar, setJumlahBayar] = useState(BAYAR_DEFAULT)
   const [statusBayar, setStatusBayar] = useState<'sudah' | 'belum'>('belum')
   const [nonTunai, setNonTunai] = useState(false)
@@ -44,6 +46,11 @@ export default function TambahSewaSheet({ sesiId, unitTersedia, riwayatNama, onC
       setError('Pilih minimal 1 kode unit.')
       return
     }
+    const durasiTotal = gabungMenitDetik(durasiMenit, durasiDetik)
+    if (durasiTotal <= 0) {
+      setError('Durasi harus lebih dari 0.')
+      return
+    }
     setMenyimpan(true)
     setError(null)
     try {
@@ -52,7 +59,7 @@ export default function TambahSewaSheet({ sesiId, unitTersedia, riwayatNama, onC
         kodeUnit: kodeTerpilih,
         namaPelanggan,
         fotoPelangganBlob: fotoFile ?? undefined,
-        durasiMenit: durasi,
+        durasiMenit: durasiTotal,
         jumlahBayar,
         statusBayar,
         nonTunai
@@ -137,21 +144,8 @@ export default function TambahSewaSheet({ sesiId, unitTersedia, riwayatNama, onC
           </div>
 
           <div className="field">
-            <p className="field-label">Durasi (menit)</p>
-            <div className="stepper">
-              <button type="button" onClick={() => setDurasi((d) => Math.max(DURASI_LANGKAH, d - DURASI_LANGKAH))}>
-                &minus;
-              </button>
-              <input
-                type="number"
-                className="stepper-input"
-                value={durasi}
-                onChange={(e) => setDurasi(Math.max(1, Number(e.target.value)))}
-              />
-              <button type="button" onClick={() => setDurasi((d) => d + DURASI_LANGKAH)}>
-                +
-              </button>
-            </div>
+            <p className="field-label">Durasi</p>
+            <DurasiStepper menit={durasiMenit} detik={durasiDetik} onChange={(m, d) => { setDurasiMenit(m); setDurasiDetik(d) }} minMenit={0} />
           </div>
 
           <div className="field">

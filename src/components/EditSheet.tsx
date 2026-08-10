@@ -3,16 +3,20 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, editTransaksi, tukarUnit, listUnitMaster, type TransaksiRecord } from '../db/db'
 import { sisaWaktuMs } from '../utils/time'
 import { formatRibuan, parseRibuan } from '../utils/format'
+import { gabungMenitDetik, pecahMenitDetik } from '../utils/durasi'
+import DurasiStepper from './DurasiStepper'
 import { toBody } from '../utils/portal'
 
 export default function EditSheet({ transaksi, onClose }: { transaksi: TransaksiRecord; onClose: () => void }) {
   const now = Date.now()
-  const sisaMenitAwal = Math.max(0, Math.round(sisaWaktuMs(transaksi, now) / 60_000))
+  const sisaMenitAwal = Math.max(0, sisaWaktuMs(transaksi, now) / 60_000)
+  const { menit: sisaMenitAwalBulat, detik: sisaDetikAwal } = pecahMenitDetik(sisaMenitAwal)
 
   const [namaPelanggan, setNamaPelanggan] = useState(transaksi.namaPelanggan ?? '')
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [kodeTerpilih, setKodeTerpilih] = useState<string[]>(transaksi.kodeUnit)
-  const [sisaMenit, setSisaMenit] = useState(sisaMenitAwal)
+  const [sisaMenit, setSisaMenit] = useState(sisaMenitAwalBulat)
+  const [sisaDetik, setSisaDetik] = useState(sisaDetikAwal)
   const [jumlahBayar, setJumlahBayar] = useState(transaksi.jumlahBayar)
   const [statusBayar, setStatusBayar] = useState(transaksi.statusBayar)
   const [nonTunai, setNonTunai] = useState(transaksi.nonTunai ?? false)
@@ -39,7 +43,7 @@ export default function EditSheet({ transaksi, onClose }: { transaksi: Transaksi
     setMenyimpan(true)
     await editTransaksi(
       transaksi.id,
-      { namaPelanggan, fotoPelangganBlob: fotoFile ?? undefined, sisaMenitBaru: sisaMenit, jumlahBayar, statusBayar, nonTunai },
+      { namaPelanggan, fotoPelangganBlob: fotoFile ?? undefined, sisaMenitBaru: gabungMenitDetik(sisaMenit, sisaDetik), jumlahBayar, statusBayar, nonTunai },
       now
     )
     const unitBerubah =
@@ -90,16 +94,7 @@ export default function EditSheet({ transaksi, onClose }: { transaksi: Transaksi
 
           <div className="field">
             <p className="field-label">Sisa waktu</p>
-            <div className="stepper">
-              <button type="button" onClick={() => setSisaMenit((m) => Math.max(0, m - 5))}>&minus;</button>
-              <input
-                type="number"
-                className="stepper-input"
-                value={sisaMenit}
-                onChange={(e) => setSisaMenit(Math.max(0, Number(e.target.value)))}
-              />
-              <button type="button" onClick={() => setSisaMenit((m) => m + 5)}>+</button>
-            </div>
+            <DurasiStepper menit={sisaMenit} detik={sisaDetik} onChange={(m, d) => { setSisaMenit(m); setSisaDetik(d) }} minMenit={0} />
           </div>
 
           <div className="field">

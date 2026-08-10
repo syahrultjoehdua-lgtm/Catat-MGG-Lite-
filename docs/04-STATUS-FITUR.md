@@ -19,7 +19,7 @@ Legenda: ✅ Selesai · ⚠️ Selesai dengan catatan · ⏸️ Placeholder/ditu
 | 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan: nilai awal 25 menit & Rp15.000, durasi bisa diketik manual (minimal 1 menit), ada ringkasan "Total waktu"/"Total tagihan" real-time. Tukar Unit sekarang per-slot (Sebelum/Sesudah per unit, bukan 1 daftar chip campur) |
 | 3.3 Alarm waktu habis (foreground vs background) | ✅ | Foreground: kartu merah + badge berkedip + bunyi + wake lock ✅ — termasuk perbaikan bug "diam total di iOS" (keep-alive audio + re-unlock tiap sentuhan, lihat `06-RIWAYAT-BUG.md` Bug #9). Getar: berfungsi di Android, **tidak bisa** di iOS (Vibration API tidak diimplementasi WebKit — keterbatasan platform, bukan bug). Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §7.3 |
 | 3.3 Alur bayar QR saat waktu habis | ✅ | Plus ditambah: bisa dipicu manual ("Bayar sekarang") tanpa harus nunggu waktu habis; plus opsi "Bayar nanti" (tutup transaksi tanpa bayar dulu, ditagih & ditandai lunas belakangan dari History) |
-| 3.4 History | ✅ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI). Tap kartu membuka Rincian Sewa versi History (`HistoryRincianSheet`), header menampilkan sub-total uang masuk sesuai tab aktif, bug tab bar ikut ter-scroll sudah diperbaiki (`position: sticky`) |
+| 3.4 History | ✅ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI). Tap kartu membuka Rincian Sewa versi History (`HistoryRincianSheet`), kartu ringkasan (unit selesai/masih berjalan, pendapatan masuk/belum dibayar, total pendapatan) tampil di atas daftar per tab, bug tab bar ikut ter-scroll sudah diperbaiki (`position: sticky`) |
 | 3.5 Master Data (Unit, Jenis Pengeluaran, QR) | ✅ | Semua CRUD lengkap |
 | 3.6 Akhiri Sesi (2 langkah) | ✅ | Plus ditambah langkah ke-3: layar sukses dengan tombol bagikan laporan. Input Saldo Awal pakai format titik ribuan, rincian pendapatan menampilkan sub-total Tunai vs Non-tunai |
 | 3.6 Retry/queue offline | ✅ | Otomatis saat buka app & saat online, plus tombol manual |
@@ -98,3 +98,22 @@ Sewa versi History, sub-total header Riwayat, format ribuan & sub-total
 tunai/non-tunai di Akhiri Sesi, dan implementasi penuh fitur "Gabung
 Pembayaran" yang sebelumnya masih placeholder — lihat `06-RIWAYAT-BUG.md`
 Bug #8 untuk detail bug iOS-nya.
+
+Sesi lanjutan ketiga: nilai awal & real-time total di Perpanjangan, menu
+Saldo Awal di Settings, seed data awal (Master Unit, Jenis Pengeluaran, QR
+default), perbaikan bug alarm diam total di iOS (`06-RIWAYAT-BUG.md` Bug #9).
+
+Sesi lanjutan keempat: langkah stepper durasi pintar (di bawah 5 menit lompat
+per 1), field detik di semua Field Durasi (`DurasiStepper.tsx`, lihat
+`02-LOGIKA-BISNIS.md` §11), kunci pinch-zoom/double-tap-zoom (viewport meta +
+`touch-action` CSS + pencegahan gestur JS, khusus mengatasi iOS yang
+mengabaikan `user-scalable=no`), tombol Simpan eksplisit di Settings Saldo
+Awal (sebelumnya auto-save tiap ketik), dan rincian Tunai/Non-tunai
+ditambahkan ke gambar Laporan Akhir Sesi (`laporanGambar.ts`).
+
+Sesi lanjutan kelima: ringkasan sub-total di History dirombak dari 1 baris
+"Total masuk" jadi kartu ringkasan 5 variabel (unit selesai, unit masih
+berjalan, pendapatan masuk, belum dibayar, total pendapatan) — dipindah dari
+subtitle header (yang punya batas tinggi tetap, `min-height: 82px`) ke kartu
+di bawah tab bar, supaya tidak berisiko tumpang tindih dengan konten di
+bawahnya kalau teksnya jadi panjang. Lihat `02-LOGIKA-BISNIS.md` §3.4.

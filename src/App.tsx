@@ -52,6 +52,34 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    // Kunci pinch-zoom & double-tap-zoom secara ekstra lewat JS — meta viewport
+    // `user-scalable=no`/`maximum-scale=1` (index.html) saja kerap DIABAIKAN oleh
+    // Safari iOS (perilaku ini konsisten dilaporkan sejak iOS 10, termasuk di
+    // mode PWA "Add to Home Screen"), jadi butuh lapis pertahanan kedua ini:
+    // - 'gesturestart'/'gesturechange' adalah API lawas khusus WebKit yang dipicu
+    //   gestur pencet 2 jari (pinch) — dicegah defaultnya di sini.
+    // - 'touchmove' dengan >1 titik sentuh juga dicegah, sebagai jaring pengaman
+    //   di browser lain (Android Chrome PWA, dst.) yang tidak mengenal event
+    //   'gesturestart' tapi tetap bisa memicu native pinch-zoom dari 2 jari.
+    // touch-action: manipulation (global.css) tetap dipertahankan supaya scroll
+    // normal 1 jari tidak ikut terganggu oleh preventDefault ini.
+    function cegahGestur(e: Event) {
+      e.preventDefault()
+    }
+    function cegahPinchTouch(e: TouchEvent) {
+      if (e.touches.length > 1) e.preventDefault()
+    }
+    document.addEventListener('gesturestart', cegahGestur)
+    document.addEventListener('gesturechange', cegahGestur)
+    document.addEventListener('touchmove', cegahPinchTouch, { passive: false })
+    return () => {
+      document.removeEventListener('gesturestart', cegahGestur)
+      document.removeEventListener('gesturechange', cegahGestur)
+      document.removeEventListener('touchmove', cegahPinchTouch)
+    }
+  }, [])
+
   const pengaturan = useLiveQuery(() => getAppSettings(), [])
 
   useEffect(() => {

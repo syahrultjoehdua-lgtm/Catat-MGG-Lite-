@@ -331,3 +331,64 @@ itu **tidak diam-diam muncul lagi** tiap kali app dibuka ulang. Flag ini
 cuma diset `true` di baris paling akhir fungsi, jadi kalau ada 1 langkah
 gagal di tengah (misalnya gagal fetch gambar QR bawaan), seed akan dicoba
 lagi secara utuh di percobaan buka app berikutnya.
+
+## 11. Durasi presisi detik & kunci zoom layar
+
+### 11.1 Field durasi sekarang punya presisi detik
+
+Sebelumnya `durasiMenit` di `TransaksiRecord` selalu bilangan bulat (menit
+saja). Sekarang field ini **boleh desimal** (mis. `25.5` = 25 menit 30
+detik) — TIDAK ada perubahan skema Dexie, cuma longgarkan asumsi "selalu
+bulat" di kode yang membacanya. Semua operasi matematis yang sudah ada
+(`sisaWaktuMs`, `proporsiTerpakai`, dst. di `utils/time.ts`) otomatis tetap
+benar karena cuma mengalikan `durasiMenit * 60_000` — desimal menit
+diperlakukan sama seperti bilangan bulat.
+
+`src/utils/durasi.ts` isinya helper konversi & tampilan:
+- `gabungMenitDetik(menit, detik)` → 1 angka desimal menit, dipakai saat
+  MENYIMPAN dari 3 form (`TambahSewaSheet`, `PerpanjangSheet`, `EditSheet`)
+- `pecahMenitDetik(desimal)` → `{menit, detik}` bulat, dipakai saat
+  MENAMPILKAN nilai tersimpan kembali ke 2 field terpisah
+- `bulatkanKeDetik(desimal)` → bulatkan ke detik terdekat, dipakai di
+  `perpanjangDurasi()` supaya tidak ada sisa desimal mengambang dari
+  penjumlahan berulang
+- `formatDurasi(desimal)` → teks tampilan, mis. `"25 menit"` (kalau detik
+  0) atau `"25 menit 30 detik"` — dipakai di semua tempat durasi
+  ditampilkan sebagai teks (Rincian Sewa, History, Data Pembayaran Grup)
+
+`src/components/DurasiStepper.tsx` — komponen UI bersama (dipasang di 3
+form yang sama di atas): 2 stepper berdampingan, menit di kiri & detik di
+kanan.
+- **Langkah menit** (`langkahMenit()`): kelipatan 5 seperti biasa (5, 10,
+  15, ...), TAPI begitu nilainya di bawah 5, langkahnya otomatis mengecil
+  jadi 1 (supaya bisa diatur presisi 1, 2, 3, 4 alih-alih lompat besar
+  dari/ke 0 atau 10). Tetap bisa diketik manual bebas di field-nya.
+- **Langkah detik**: kelipatan 10 (0, 10, 20, ..., 50), lewat 60 otomatis
+  "naik" 1 menit & sisa detiknya menyesuaikan (begitu juga sebaliknya saat
+  turun di bawah 0). Tetap bisa diketik manual 0-59.
+
+`editTransaksi()` (di `db.ts`) untuk field "Sisa waktu" juga sudah diubah
+dari pembulatan ke MENIT jadi pembulatan ke DETIK — supaya presisi detik
+yang diinput di form tidak hilang saat disimpan.
+
+### 11.2 Kunci zoom layar (pinch-zoom & double-tap-zoom)
+
+Dilaporkan zoom-in masih bisa dilakukan di PWA baik Android maupun iOS
+walau app didesain untuk tampilan tetap 1 skala. Perbaikannya 2 lapis
+(`index.html` + `App.tsx` + `global.css`):
+
+1. **Viewport meta** (`index.html`): ditambah `maximum-scale=1,
+   user-scalable=no`. Ini cukup untuk kebanyakan browser Android, TAPI
+   Safari iOS terkenal suka **mengabaikan** pengaturan ini (perilaku yang
+   konsisten dilaporkan sejak iOS 10, termasuk di mode PWA "Add to Home
+   Screen").
+2. **CSS `touch-action`** (`global.css`): `manipulation` di `html`/`body`
+   (mematikan double-tap-zoom & pinch-zoom bawaan browser, tapi tetap
+   mengizinkan scroll/tap normal), `pan-y` di `.app-content` dan `.sheet`
+   supaya scroll vertikal di dalam keduanya tetap berfungsi normal.
+3. **Pencegahan gestur lewat JS** (`App.tsx`, `useEffect`): `preventDefault()`
+   pada event `gesturestart`/`gesturechange` (API lawas khusus WebKit yang
+   dipicu gestur pencet 2 jari — inilah yang sebenarnya menangani kasus iOS
+   yang mengabaikan meta viewport), plus `touchmove` dengan lebih dari 1
+   titik sentuh dicegah juga sebagai jaring pengaman tambahan di browser
+   lain.
