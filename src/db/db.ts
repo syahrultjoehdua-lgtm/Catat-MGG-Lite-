@@ -116,7 +116,7 @@ export async function getOrCreateActiveSession(): Promise<SesiRecord> {
   const aktif = semuaSesi.find((s) => !s.closedAt)
   if (aktif) return aktif
 
-  const saldoSebelumnya = await getSaldoAkhirSesiSebelumnya()
+  const saldoSebelumnya = await getSaldoTunaiAkhirSesiSebelumnya()
   const id = await db.sesi.add({
     startedAt: new Date().toISOString(),
     closedAt: null,
@@ -263,8 +263,11 @@ export async function editTransaksi(id: number, patch: EditTransaksiInput, now: 
   }
   if (patch.statusBayar !== undefined && patch.statusBayar !== t.statusBayar) {
     update.statusBayar = patch.statusBayar
-    update.nonTunai = patch.nonTunai ?? false
     perubahan.push('status bayar')
+  }
+  if (patch.nonTunai !== undefined && patch.nonTunai !== (t.nonTunai ?? false)) {
+    update.nonTunai = patch.nonTunai
+    perubahan.push('metode bayar (tunai/non-tunai)')
   }
   if (patch.sisaMenitBaru !== undefined) {
     const mulai = new Date(t.waktuMulai).getTime()
@@ -445,11 +448,29 @@ export async function hitungPendapatanSesi(sesiId: number): Promise<number> {
   return semua.reduce((total, t) => total + t.jumlahBayar, 0)
 }
 
-/** Saldo akhir sesi terakhir yang sudah ditutup — dipakai sebagai default Saldo Awal. */
-export async function getSaldoAkhirSesiSebelumnya(): Promise<number | null> {
+/** Saldo akhir TUNAI SAJA dari sesi terakhir yang sudah ditutup — dipakai sebagai
+ * default Saldo Awal sesi berikutnya. Sengaja dihitung ULANG dari data transaksi
+ * & pengeluaran sesi itu (bukan dari field `saldoAkhir` yang tersimpan, yang
+ * mencampur tunai+non-tunai), supaya konsisten bahkan untuk sesi lama yang
+ * ditutup sebelum pemisahan ini ada — nilai `nonTunai` per transaksi sudah selalu
+ * tercatat sejak awal, jadi bisa dihitung ulang kapan saja tanpa migrasi data.
+ * Asumsi: semua pengeluaran dibayar dari uang tunai fisik (non-tunai tidak
+ * memotong kas fisik), jadi TIDAK ikut mengurangi saldo non-tunai. */
+export async function getSaldoTunaiAkhirSesiSebelumnya(): Promise<number | null> {
   const semua = await db.sesi.orderBy('id').reverse().toArray()
   const terakhirDitutup = semua.find((s) => s.closedAt)
-  return terakhirDitutup?.saldoAkhir ?? null
+  if (!terakhirDitutup?.id) return null
+
+  const transaksiSesi = await db.transaksi
+    .where('sesiId')
+    .equals(terakhirDitutup.id)
+    .filter((t) => !t.dibatalkan)
+    .toArray()
+  const pendapatanTunaiSesi = transaksiSesi.filter((t) => !t.nonTunai).reduce((s, t) => s + t.jumlahBayar, 0)
+  const pengeluaranSesi = await listPengeluaranSesi(terakhirDitutup.id)
+  const totalPengeluaran = pengeluaranSesi.reduce((s, p) => s + p.nominal, 0)
+
+  return (terakhirDitutup.saldoAwal ?? 0) + pendapatanTunaiSesi - totalPengeluaran
 }
 
 export async function listPengeluaranSesi(sesiId: number): Promise<PengeluaranRecord[]> {

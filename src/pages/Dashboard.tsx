@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
 import UnitCard from '../components/UnitCard'
 import GroupUnitCard from '../components/GroupUnitCard'
-import TambahSewaSheet from '../components/TambahSewaSheet'
 import CardMenu from '../components/CardMenu'
 import PerpanjangSheet from '../components/PerpanjangSheet'
-import EditSheet from '../components/EditSheet'
 import TukarUnitSheet from '../components/TukarUnitSheet'
 import PembayaranQrSheet from '../components/PembayaranQrSheet'
 import GabungPembayaranSheet from '../components/GabungPembayaranSheet'
@@ -16,7 +15,6 @@ import {
   getOrCreateActiveSession,
   listUnitMaster,
   getKodeUnitSedangDisewa,
-  getRiwayatNamaPelanggan,
   jedaTransaksi,
   lanjutkanTransaksi,
   tutupTransaksi,
@@ -27,10 +25,8 @@ import {
 import { sisaWaktuMs } from '../utils/time'
 
 type SheetAktif =
-  | { jenis: 'tambah' }
   | { jenis: 'menu'; t: TransaksiRecord }
   | { jenis: 'perpanjang'; t: TransaksiRecord }
-  | { jenis: 'edit'; t: TransaksiRecord }
   | { jenis: 'tukarUnit'; t: TransaksiRecord }
   | { jenis: 'bayarQr'; t: TransaksiRecord; tutupSetelahBayar: boolean }
   | { jenis: 'gabungBayar'; t: TransaksiRecord }
@@ -38,6 +34,7 @@ type SheetAktif =
   | null
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [sesi, setSesi] = useState<SesiRecord | null>(null)
   const [sheet, setSheet] = useState<SheetAktif>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -69,8 +66,6 @@ export default function Dashboard() {
     if (!sesi?.id) return []
     return getKodeUnitSedangDisewa(sesi.id)
   }, [sesi?.id, transaksiAktif]) ?? []
-
-  const riwayatNama = useLiveQuery(() => getRiwayatNamaPelanggan(), [transaksiAktif]) ?? []
 
   // Jumlah anggota grup yang sudah selesai (tidak masuk daftar aktif) — dihitung
   // supaya kartu gabungan tetap menampilkan total unit yang benar walau sebagian
@@ -163,7 +158,7 @@ export default function Dashboard() {
           : 'Memuat sesi...'
       }
       fab={
-        <button className="fab" onClick={() => setSheet({ jenis: 'tambah' })} disabled={!sesi}>
+        <button className="fab" onClick={() => navigate('/tambah-sewa')} disabled={!sesi}>
           + Tambah sewa
         </button>
       }
@@ -201,23 +196,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {sheet?.jenis === 'tambah' && sesi?.id && (
-        <TambahSewaSheet
-          sesiId={sesi.id}
-          unitTersedia={unitTersedia}
-          riwayatNama={riwayatNama}
-          onClose={() => setSheet(null)}
-          onSaved={() => setSheet(null)}
-        />
-      )}
-
       {sheet?.jenis === 'menu' && (
         <CardMenu
           transaksi={sheet.t}
           now={now}
           onClose={() => setSheet(null)}
           onPerpanjangan={() => setSheet({ jenis: 'perpanjang', t: sheet.t })}
-          onEdit={() => setSheet({ jenis: 'edit', t: sheet.t })}
+          onEdit={() => sheet.t.id && navigate(`/edit-transaksi/${sheet.t.id}`)}
           onTukarUnit={() => setSheet({ jenis: 'tukarUnit', t: sheet.t })}
           onJedaLanjut={() => handleJedaLanjut(sheet.t)}
           onBayarSekarang={() => setSheet({ jenis: 'bayarQr', t: sheet.t, tutupSetelahBayar: false })}
@@ -230,8 +215,6 @@ export default function Dashboard() {
       {sheet?.jenis === 'perpanjang' && (
         <PerpanjangSheet transaksi={sheet.t} onClose={() => setSheet(null)} />
       )}
-
-      {sheet?.jenis === 'edit' && <EditSheet transaksi={sheet.t} onClose={() => setSheet(null)} />}
 
       {sheet?.jenis === 'tukarUnit' && (
         <TukarUnitSheet transaksi={sheet.t} unitBisaDipilih={unitTersedia} onClose={() => setSheet(null)} />

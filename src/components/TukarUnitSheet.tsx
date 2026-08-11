@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { TransaksiRecord, UnitMaster } from '../db/db'
 import { tukarUnit } from '../db/db'
 import { toBody } from '../utils/portal'
+import { kelompokkanKodeUnit } from '../utils/unitKategori'
 import { IconSwap } from './icons'
 
 interface TukarUnitSheetProps {
@@ -70,10 +71,14 @@ export default function TukarUnitSheet({ transaksi, unitBisaDipilih, onClose }: 
                 <div className="tukar-unit-slot">
                   <p className="field-label" style={{ marginBottom: 4 }}>Sesudah</p>
                   <select value={slotBaru[i]} onChange={(e) => ubahSlot(i, e.target.value)}>
-                    {opsiUntukSlot(i).map((kode) => (
-                      <option key={kode} value={kode}>
-                        {kode}{kode === kodeLama ? ' (tetap)' : ''}
-                      </option>
+                    {kelompokkanKodeUnit(opsiUntukSlot(i)).map((kelompok) => (
+                      <optgroup key={kelompok.kategori} label={kelompok.kategori}>
+                        {kelompok.kodeList.map((kode) => (
+                          <option key={kode} value={kode}>
+                            {kode}{kode === kodeLama ? ' (tetap)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>

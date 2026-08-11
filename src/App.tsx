@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import History from './pages/History'
 import Settings from './pages/Settings'
 import AkhiriSesi from './pages/AkhiriSesi'
+import TambahSewa from './pages/TambahSewa'
+import EditTransaksi from './pages/EditTransaksi'
 import MasterUnit from './pages/MasterData/MasterUnit'
 import MasterExpenseType from './pages/MasterData/MasterExpenseType'
 import MasterQr from './pages/MasterData/MasterQr'
@@ -92,6 +94,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Splash />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/tambah-sewa" element={<TambahSewa />} />
+        <Route path="/edit-transaksi/:id" element={<EditTransaksi />} />
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/akhiri-sesi" element={<AkhiriSesi />} />

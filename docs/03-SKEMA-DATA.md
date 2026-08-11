@@ -15,8 +15,8 @@ Didefinisikan di `src/db/db.ts`. Nama database: `catat-mgg-lite`.
 | `id` | number (auto) | Primary key |
 | `startedAt` | string (ISO) | Waktu sesi mulai |
 | `closedAt` | string (ISO) \| null | Kosong = sesi masih aktif. Terisi = sudah diakhiri |
-| `saldoAwal` | number? | Diisi saat Akhiri Sesi |
-| `saldoAkhir` | number? | Diisi saat Akhiri Sesi |
+| `saldoAwal` | number? | Diisi saat Akhiri Sesi (atau lebih awal, lewat Settings — lihat `02-LOGIKA-BISNIS.md` §10.1) |
+| `saldoAkhir` | number? | Diisi saat Akhiri Sesi. Ini TOTAL campuran (tunai+non-tunai) — untuk saldo TUNAI SAJA, jangan baca field ini, pakai `getSaldoTunaiAkhirSesiSebelumnya()` yang menghitung ulang dari data transaksi (lihat `02-LOGIKA-BISNIS.md` §15). Sengaja tidak ada field `saldoAkhirTunai` terpisah di sini — dihitung on-demand supaya berlaku juga untuk sesi lama tanpa migrasi data |
 | `synced` | boolean? | `false` = belum berhasil terkirim ke backend |
 
 ### Tabel `transaksi`

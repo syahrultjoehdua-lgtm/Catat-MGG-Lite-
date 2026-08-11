@@ -392,3 +392,83 @@ walau app didesain untuk tampilan tetap 1 skala. Perbaikannya 2 lapis
    yang mengabaikan meta viewport), plus `touchmove` dengan lebih dari 1
    titik sentuh dicegah juga sebagai jaring pengaman tambahan di browser
    lain.
+
+## 12. Tambah Sewa & Edit Transaksi jadi halaman penuh
+
+Sebelumnya keduanya bottom sheet (`TambahSewaSheet.tsx`, `EditSheet.tsx`).
+Sekarang jadi halaman penuh (`pages/TambahSewa.tsx`, `pages/EditTransaksi.tsx`)
+dengan route `/tambah-sewa` dan `/edit-transaksi/:id` — 2 file lama itu sudah
+DIHAPUS dari `components/`. Alasan diminta: form-nya dianggap cukup
+panjang/detail, jadi lebih nyaman sebagai halaman penuh (keyboard tidak
+menutupi sebagian field seperti kadang terjadi di sheet).
+
+`EditTransaksi.tsx` menerima `id` transaksi lewat URL param, bukan lewat
+props — jadi bisa dibuka dari 2 tempat berbeda (Dashboard untuk transaksi
+aktif, History untuk transaksi selesai) tanpa duplikasi komponen. Tombol
+"Batal"/setelah "Simpan" keduanya `navigate(-1)`, balik ke halaman ASAL yang
+membukanya (bukan hardcode ke satu tujuan tetap).
+
+## 13. Pengelompokan kode unit per kategori
+
+Field pemilihan kode unit (di Tambah Sewa, Edit Transaksi, dan dropdown
+"Sesudah" di Tukar Unit) sekarang dikelompokkan per kategori alat berat,
+lewat `src/utils/unitKategori.ts`:
+
+- **Excavator** — kode berawalan `E` (E02-E07)
+- **Dump Truck** — kode berawalan `T` (T03-T06)
+- **Loader** — kode berawalan `L` (L01-L02)
+- **Forklift** — kode berawalan `F` (F01)
+- **Lainnya** — kode dengan huruf awal yang tidak dikenali di atas
+
+Pengelompokan dari **huruf pertama kode**, BUKAN daftar kode yang di-hardcode
+— supaya unit baru yang ditambahkan user sendiri lewat Master Unit (mis.
+`E08`) otomatis masuk kategori yang benar tanpa perlu ubah kode ini. Kategori
+baru (misalnya alat jenis lain di masa depan) akan otomatis masuk "Lainnya"
+sampai ditambahkan pemetaan hurufnya di `KATEGORI_LABEL`.
+
+## 14. Jumlah bayar berlipat otomatis sesuai jumlah unit
+
+Di **Tambah Sewa**, nilai awal "Jumlah bayar" = Rp15.000 &times; jumlah unit
+yang sedang dipilih, dihitung ULANG secara real-time tiap kali chip unit
+ditoggle (2 unit &rarr; Rp30.000, 3 unit &rarr; Rp45.000, dst.) — durasi TIDAK
+ikut berubah, tetap di nilai default (25 menit). Begitu user pernah mengubah
+sendiri field Jumlah Bayar secara manual (lewat tombol +/- atau ketik
+langsung), auto-hitung ini BERHENTI mengikuti — perubahan manual user
+dihormati walau unit ditambah/dikurangi lagi setelahnya (flag internal
+`bayarDisentuhManual`).
+
+Di **Perpanjangan**, pola serupa tapi lebih sederhana — karena jumlah unit
+transaksi yang sedang diperpanjang itu TETAP (tidak bisa ubah unit dari sheet
+ini), nilai awal "Tambah jumlah bayar" dihitung SEKALI saat sheet dibuka:
+Rp15.000 &times; `transaksi.kodeUnit.length`. Tidak perlu logika real-time
+karena jumlah unitnya memang tidak bisa berubah selama sheet ini terbuka.
+
+**Edit Transaksi sengaja TIDAK ikut aturan ini** — field Jumlah Bayar di sana
+selalu mulai dari nilai yang sudah tersimpan (`transaksi.jumlahBayar`), bukan
+dihitung ulang dari jumlah unit, karena Edit dipakai untuk KOREKSI data yang
+sudah ada, bukan menentukan nilai baru dari nol.
+
+## 15. Saldo Awal — sekarang berbasis TUNAI saja
+
+Sebelumnya `getSaldoAkhirSesiSebelumnya()` mengambil field `saldoAkhir` yang
+tersimpan di sesi (gabungan tunai + non-tunai). Sekarang diganti
+`getSaldoTunaiAkhirSesiSebelumnya()` (di `db.ts`) yang menghitung ULANG dari
+data transaksi & pengeluaran sesi sebelumnya:
+
+```
+saldoAwal(sesi lalu) + pendapatanTUNAI(sesi lalu) - totalPengeluaran(sesi lalu)
+```
+
+Pendapatan **non-tunai** (QRIS, transfer, dsb.) SENGAJA tidak ikut dihitung
+di sini — uang itu tidak pernah masuk ke laci kas fisik, jadi tidak masuk
+akal jadi bagian modal tunai sesi berikutnya. Pengeluaran diasumsikan SELALU
+dibayar dari kas tunai fisik (asumsi wajar untuk operasional harian seperti
+ini), jadi tetap mengurangi saldo tunai sepenuhnya.
+
+Dihitung ulang dari data mentah (transaksi + pengeluaran), BUKAN dari sebuah
+field snapshot baru yang perlu disimpan — supaya tetap akurat bahkan untuk
+sesi-sesi lama yang sudah ditutup sebelum pemisahan tunai/non-tunai ini ada
+(field `nonTunai` di tiap transaksi sudah selalu tercatat sejak awal, jadi
+tidak perlu migrasi data apa pun). Dipakai di 2 tempat: auto-isi Saldo Awal
+saat sesi baru dibuat (`getOrCreateActiveSession()`), dan tombol "Isi
+otomatis dari saldo tunai sesi sebelumnya" di Settings.

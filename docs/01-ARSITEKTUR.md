@@ -77,6 +77,8 @@ catat-mgg-lite/
 │   ├── pages/                  ← 1 file = 1 halaman/rute
 │   │   ├── Splash.tsx
 │   │   ├── Dashboard.tsx
+│   │   ├── TambahSewa.tsx        ← Halaman FULL SCREEN (bukan sheet lagi, lihat §6)
+│   │   ├── EditTransaksi.tsx     ← Halaman FULL SCREEN, dipakai dari Dashboard & History
 │   │   ├── History.tsx
 │   │   ├── Settings.tsx
 │   │   ├── AkhiriSesi.tsx
@@ -92,10 +94,8 @@ catat-mgg-lite/
 │   │   ├── GroupUnitCard.tsx     ← Kartu gabungan (fitur Gabung Pembayaran)
 │   │   ├── CardMenu.tsx          ← Sheet "Rincian Sewa" (semua aksi transaksi, transaksi aktif)
 │   │   ├── HistoryRincianSheet.tsx ← Sheet "Rincian Sewa" versi History (transaksi selesai)
-│   │   ├── TambahSewaSheet.tsx   ← Form sewa baru
-│   │   ├── EditSheet.tsx         ← Form edit transaksi
 │   │   ├── PerpanjangSheet.tsx
-│   │   ├── TukarUnitSheet.tsx    ← Tukar unit per-slot (Sebelum/Sesudah)
+│   │   ├── TukarUnitSheet.tsx    ← Tukar unit per-slot (Sebelum/Sesudah), dropdown dikelompokkan per kategori
 │   │   ├── DurasiStepper.tsx     ← Stepper menit+detik bersama (Tambah/Perpanjang/Edit)
 │   │   ├── PembayaranQrSheet.tsx ← Termasuk opsi "Bayar nanti"
 │   │   ├── FullQrView.tsx        ← QR full-screen
@@ -109,6 +109,7 @@ catat-mgg-lite/
 │   │   ├── time.ts               ← Hitung sisa waktu, warna ring, dll
 │   │   ├── format.ts             ← Format angka jadi "Rp15.000"
 │   │   ├── durasi.ts             ← Konversi/format durasi menit+detik, langkah stepper pintar
+│   │   ├── unitKategori.ts       ← Kelompokkan kode unit per kategori (Excavator/Dump Truck/Loader/Forklift)
 │   │   ├── portal.tsx            ← Helper createPortal(node, document.body) — dipakai semua bottom sheet, perbaikan bug iOS (lihat 06-RIWAYAT-BUG.md Bug #8)
 │   │   ├── alarm.ts              ← Bunyi (Web Audio API) + getar + wake lock
 │   │   └── laporanGambar.ts      ← Generate gambar ringkasan sesi (Canvas)
@@ -138,6 +139,15 @@ Splash (/)
 Dashboard (/dashboard)  ⇄  Riwayat (/history)  ⇄  Settings (/settings)
    (3 tab di Bottom Nav, semua pakai komponen <AppShell>)
 
+Tambah Sewa & Edit Transaksi TIDAK lagi bottom sheet — sekarang halaman
+tersendiri (pakai <BackHeader>, bukan <AppShell>, sama seperti sub-halaman
+Settings di bawah):
+  /tambah-sewa              (dibuka dari FAB "+ Tambah sewa" di Dashboard)
+  /edit-transaksi/:id       (dibuka dari CardMenu di Dashboard MAUPUN dari
+                              HistoryRincianSheet di Riwayat — makanya alur
+                              "batal"/"simpan"-nya pakai navigate(-1), balik
+                              ke halaman asal manapun yang membukanya)
+
 Settings juga punya sub-halaman (pakai <BackHeader>, bukan <AppShell>):
   /akhiri-sesi
   /settings/units           (Master Unit)
@@ -145,9 +155,13 @@ Settings juga punya sub-halaman (pakai <BackHeader>, bukan <AppShell>):
   /settings/qr              (Master QR Pembayaran)
 ```
 
-Semua transaksi (Tambah Sewa, Rincian Sewa, Edit, dst.) **bukan halaman
-terpisah** — itu semua "bottom sheet" (modal yang muncul dari bawah layar) di
-atas halaman Dashboard, dikelola lewat 1 state `sheet` di `Dashboard.tsx`.
+Sisa alur transaksi lain (Rincian Sewa, Perpanjangan, Tukar Unit, Gabung
+Pembayaran, Bayar QR) TETAP "bottom sheet" (modal yang muncul dari bawah
+layar) di atas halaman Dashboard, dikelola lewat 1 state `sheet` di
+`Dashboard.tsx` — cuma Tambah Sewa & Edit Transaksi saja yang dipisah jadi
+halaman penuh (permintaan eksplisit: form-nya dianggap cukup panjang/detail
+sehingga lebih nyaman sebagai halaman sendiri daripada sheet yang bisa
+setengah tertutup keyboard).
 
 ## 7. Kenapa `GlobalAlarmWatcher` dipasang di `App.tsx`, bukan di `Dashboard.tsx`?
 

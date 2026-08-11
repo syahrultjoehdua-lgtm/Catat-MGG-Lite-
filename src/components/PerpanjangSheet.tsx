@@ -7,13 +7,15 @@ import DurasiStepper from './DurasiStepper'
 import { toBody } from '../utils/portal'
 
 const DURASI_AWAL_MENIT = 25 // menit — nilai awal saat sheet dibuka
-const BAYAR_AWAL = 15000 // Rp — nilai awal saat sheet dibuka
+const BAYAR_AWAL_PER_UNIT = 15000 // Rp per unit — nilai awal saat sheet dibuka
 const LANGKAH_BAYAR = 5000
 
 export default function PerpanjangSheet({ transaksi, onClose }: { transaksi: TransaksiRecord; onClose: () => void }) {
   const [tambahMenit, setTambahMenit] = useState(DURASI_AWAL_MENIT)
   const [tambahDetik, setTambahDetik] = useState(0)
-  const [tambahBayar, setTambahBayar] = useState(BAYAR_AWAL)
+  // Nilai awal berlipat sesuai jumlah unit di transaksi ini (mis. 2 unit -> Rp30.000,
+  // 3 unit -> Rp45.000) — durasi tetap 25 menit terlepas dari jumlah unit.
+  const [tambahBayar, setTambahBayar] = useState(BAYAR_AWAL_PER_UNIT * Math.max(1, transaksi.kodeUnit.length))
   const [menyimpan, setMenyimpan] = useState(false)
 
   const tambahanTotal = gabungMenitDetik(tambahMenit, tambahDetik)

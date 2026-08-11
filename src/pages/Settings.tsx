@@ -8,7 +8,7 @@ import {
   setAppSettings,
   getOrCreateActiveSession,
   setSaldoAwalSesiAktif,
-  getSaldoAkhirSesiSebelumnya
+  getSaldoTunaiAkhirSesiSebelumnya
 } from '../db/db'
 import { cobaKirimSemuaSesiBelumTerkirim } from '../services/sync'
 import { mulaiAlarm, hentikanAlarm } from '../utils/alarm'
@@ -23,7 +23,7 @@ export default function Settings() {
   const [statusSimpanSaldo, setStatusSimpanSaldo] = useState<'idle' | 'menyimpan' | 'tersimpan'>('idle')
 
   useEffect(() => {
-    getSaldoAkhirSesiSebelumnya().then(setSaldoSebelumnya)
+    getSaldoTunaiAkhirSesiSebelumnya().then(setSaldoSebelumnya)
   }, [])
 
   // Sinkron dari DB ke draft, tapi cuma kalau draft belum pernah disentuh user
@@ -75,12 +75,12 @@ export default function Settings() {
           onChange={(e) => setSaldoAwalDraft(parseRibuan(e.target.value))}
         />
         <p className="field-hint">
-          Otomatis terisi dari saldo akhir sesi sebelumnya begitu sesi baru mulai — bisa diubah manual kapan
-          saja sebelum sesi ini diakhiri. Jangan lupa ketuk "Simpan" setelah mengetik.
+          Otomatis terisi dari saldo TUNAI akhir sesi sebelumnya (di luar non-tunai) begitu sesi baru mulai —
+          bisa diubah manual kapan saja sebelum sesi ini diakhiri. Jangan lupa ketuk "Simpan" setelah mengetik.
         </p>
         {saldoSebelumnya !== null && (
           <button style={{ marginTop: 8 }} onClick={() => setSaldoAwalDraft(saldoSebelumnya)}>
-            Isi otomatis dari sesi sebelumnya (Rp{formatRibuan(saldoSebelumnya)})
+            Isi otomatis dari saldo tunai sesi sebelumnya (Rp{formatRibuan(saldoSebelumnya)})
           </button>
         )}
         <button

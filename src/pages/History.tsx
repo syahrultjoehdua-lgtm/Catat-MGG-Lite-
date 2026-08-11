@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AppShell from '../components/AppShell'
-import EditSheet from '../components/EditSheet'
 import HistoryRincianSheet from '../components/HistoryRincianSheet'
 import { db, listPengeluaranSesi, type TransaksiRecord } from '../db/db'
 import { formatDurasi } from '../utils/durasi'
@@ -40,9 +40,9 @@ function BarisTransaksi({ t, onTap }: { t: TransaksiRecord; onTap: () => void })
 }
 
 export default function History() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<'aktif' | 'selesai'>('aktif')
   const [transaksiDilihat, setTransaksiDilihat] = useState<TransaksiRecord | null>(null)
-  const [transaksiDiedit, setTransaksiDiedit] = useState<TransaksiRecord | null>(null)
   const [membagikan, setMembagikan] = useState(false)
 
   async function bagikanLaporan(data: DataLaporanSesi) {
@@ -224,14 +224,9 @@ export default function History() {
         <HistoryRincianSheet
           transaksi={transaksiDilihat}
           onClose={() => setTransaksiDilihat(null)}
-          onEdit={() => {
-            setTransaksiDiedit(transaksiDilihat)
-            setTransaksiDilihat(null)
-          }}
+          onEdit={() => transaksiDilihat.id && navigate(`/edit-transaksi/${transaksiDilihat.id}`)}
         />
       )}
-
-      {transaksiDiedit && <EditSheet transaksi={transaksiDiedit} onClose={() => setTransaksiDiedit(null)} />}
     </AppShell>
   )
 }

@@ -6,7 +6,7 @@ import {
   db,
   getOrCreateActiveSession,
   hitungPendapatanSesi,
-  getSaldoAkhirSesiSebelumnya,
+  getSaldoTunaiAkhirSesiSebelumnya,
   akhiriSesi,
   listJenisPengeluaran,
   listTransaksiSesi,
@@ -54,7 +54,7 @@ export default function AkhiriSesi() {
         listTransaksiSesi(s.id)
       ])
       setPendapatan(p)
-      setSaldoAwal(s.saldoAwal ?? (await getSaldoAkhirSesiSebelumnya()) ?? 0)
+      setSaldoAwal(s.saldoAwal ?? (await getSaldoTunaiAkhirSesiSebelumnya()) ?? 0)
       setJumlahUnitAktif(transaksiAktif.length)
       setJumlahUnitDisewa(semuaTransaksi.filter((t) => !t.dibatalkan).reduce((n, t) => n + t.kodeUnit.length, 0))
       const transaksiDihitung = semuaTransaksi.filter((t) => !t.dibatalkan)

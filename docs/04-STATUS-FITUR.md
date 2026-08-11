@@ -14,9 +14,9 @@ Legenda: ✅ Selesai · ⚠️ Selesai dengan catatan · ⏸️ Placeholder/ditu
 | 3.1 Splash Screen | ✅ | Cek/lanjutkan sesi otomatis via `getOrCreateActiveSession()` |
 | 3.2 Konsep Sesi | ✅ | |
 | 3.3 Dashboard — daftar kartu unit | ✅ | Diurutkan sisa waktu tersingkat |
-| 3.3 Form Sewa Baru | ✅ | Semua field sesuai (kode unit, nama, foto, durasi, jumlah bayar, status bayar) |
+| 3.3 Form Sewa Baru | ✅ | Sekarang halaman PENUH (`/tambah-sewa`, bukan bottom sheet lagi). Kode unit dikelompokkan per kategori (Excavator/Dump Truck/Loader/Forklift). Jumlah Bayar nilai awal berlipat real-time sesuai jumlah unit dipilih (Rp15.000/unit) |
 | 3.3 Transaksi Multi-Unit | ✅ | 1 transaksi/1 timer/1 pembayaran |
-| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan: nilai awal 25 menit & Rp15.000, durasi bisa diketik manual (minimal 1 menit), ada ringkasan "Total waktu"/"Total tagihan" real-time. Tukar Unit sekarang per-slot (Sebelum/Sesudah per unit, bukan 1 daftar chip campur) |
+| 3.3 Aksi per transaksi (Perpanjangan, Edit, Tukar Unit, Jeda/Lanjut, Batalkan, Paksa Selesai, Tandai Sudah Dibayar) | ✅ | Semua ada, diakses lewat sheet "Rincian Sewa". Perpanjangan: nilai awal 25 menit & Rp15.000/unit (berlipat sesuai jumlah unit transaksi), durasi bisa diketik manual (minimal 1 menit), ada ringkasan "Total waktu"/"Total tagihan" real-time. Tukar Unit per-slot (Sebelum/Sesudah per unit), dropdown dikelompokkan per kategori. Edit sekarang halaman PENUH (`/edit-transaksi/:id`, bukan bottom sheet), dipakai dari Dashboard maupun History |
 | 3.3 Alarm waktu habis (foreground vs background) | ✅ | Foreground: kartu merah + badge berkedip + bunyi + wake lock ✅ — termasuk perbaikan bug "diam total di iOS" (keep-alive audio + re-unlock tiap sentuhan, lihat `06-RIWAYAT-BUG.md` Bug #9). Getar: berfungsi di Android, **tidak bisa** di iOS (Vibration API tidak diimplementasi WebKit — keterbatasan platform, bukan bug). Background (layar mati/terkunci): **tidak bisa diandalkan** dari PWA murni — lihat `02-LOGIKA-BISNIS.md` §7.3 |
 | 3.3 Alur bayar QR saat waktu habis | ✅ | Plus ditambah: bisa dipicu manual ("Bayar sekarang") tanpa harus nunggu waktu habis; plus opsi "Bayar nanti" (tutup transaksi tanpa bayar dulu, ditagih & ditandai lunas belakangan dari History) |
 | 3.4 History | ✅ | Didesain ulang total dari spesifikasi asli (jadi 2 tab: Sesi aktif/Sesi selesai, hanya berisi transaksi yang SUDAH SELESAI). Tap kartu membuka Rincian Sewa versi History (`HistoryRincianSheet`), kartu ringkasan (unit selesai/masih berjalan, pendapatan masuk/belum dibayar, total pendapatan) tampil di atas daftar per tab, bug tab bar ikut ter-scroll sudah diperbaiki (`position: sticky`) |
@@ -57,10 +57,10 @@ selama pengembangan:
   sheet sekarang dirender lewat React portal ke `document.body`
   (`src/utils/portal.tsx`), bukan lagi bersarang di `.app-content` — lihat
   `06-RIWAYAT-BUG.md` Bug #8
-- **Saldo awal bisa diatur dari Settings** — otomatis terisi dari saldo akhir
-  sesi sebelumnya saat sesi baru mulai, bisa dikoreksi manual kapan saja
-  lewat Settings (bukan cuma saat Akhiri Sesi) — lihat `02-LOGIKA-BISNIS.md`
-  §10.1
+- **Saldo awal bisa diatur dari Settings** — otomatis terisi dari saldo TUNAI
+  akhir sesi sebelumnya (non-tunai tidak ikut, lihat `02-LOGIKA-BISNIS.md`
+  §15) saat sesi baru mulai, bisa dikoreksi manual kapan saja lewat Settings
+  (bukan cuma saat Akhiri Sesi), dengan tombol Simpan eksplisit
 - **Seed data awal aplikasi** — Master Unit (13 kode), Master Jenis
   Pengeluaran (3 jenis), dan QR pembayaran default (gambar QRIS resmi)
   otomatis terisi sekali saat app pertama kali dibuka, tetap bisa
@@ -68,6 +68,9 @@ selama pengembangan:
 - **Perbaikan bug "alarm diam total di iOS PWA"** — keep-alive audio +
   re-unlock AudioContext di tiap sentuhan, lihat `06-RIWAYAT-BUG.md` Bug #9.
   Getar tetap tidak bisa di iOS (keterbatasan platform WebKit, bukan bug)
+- **Tambah Sewa & Edit Transaksi jadi halaman penuh** (bukan bottom sheet
+  lagi), kode unit dikelompokkan per kategori alat berat, Jumlah Bayar
+  berlipat otomatis sesuai jumlah unit — lihat `02-LOGIKA-BISNIS.md` §12-14
 
 ## Session log (untuk konteks historis)
 
@@ -117,3 +120,16 @@ berjalan, pendapatan masuk, belum dibayar, total pendapatan) — dipindah dari
 subtitle header (yang punya batas tinggi tetap, `min-height: 82px`) ke kartu
 di bawah tab bar, supaya tidak berisiko tumpang tindih dengan konten di
 bawahnya kalau teksnya jadi panjang. Lihat `02-LOGIKA-BISNIS.md` §3.4.
+
+Sesi lanjutan keenam: bug fix — Edit Transaksi gagal simpan total saat status
+bayar tetap "Sudah" tapi metode dibah Tunai↔Non-tunai (lihat
+`06-RIWAYAT-BUG.md` Bug #10).
+
+Sesi lanjutan ketujuh: Tambah Sewa & Edit Transaksi diubah dari bottom sheet
+jadi halaman penuh (`/tambah-sewa`, `/edit-transaksi/:id`); kode unit
+dikelompokkan per kategori alat berat (Excavator/Dump Truck/Loader/Forklift,
+lewat `utils/unitKategori.ts`, juga diterapkan ke dropdown Tukar Unit); Jumlah
+Bayar di Tambah Sewa & Perpanjangan berlipat otomatis sesuai jumlah unit
+(Rp15.000/unit); Saldo Awal diubah dari berbasis saldo akhir TOTAL jadi
+berbasis saldo akhir TUNAI SAJA (non-tunai tidak ikut terhitung). Lihat
+`02-LOGIKA-BISNIS.md` §12-15.

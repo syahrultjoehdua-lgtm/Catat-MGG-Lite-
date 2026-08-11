@@ -389,6 +389,57 @@ sewaktu-waktu).
 
 ---
 
+## Bug #10 — Edit Transaksi: ganti Tunai↔Non-tunai tanpa ganti status bayar tidak tersimpan sama sekali
+
+**Ditemukan saat**: pengujian nyata — transaksi dengan status "Sudah - Tunai"
+diubah lewat Edit Transaksi ke "Sudah - Non-tunai" (status bayarnya TETAP
+"Sudah", cuma checkbox non-tunai yang dicentang), ditekan Simpan — tidak ada
+apa pun yang tersimpan, sama sekali tidak error tapi juga tidak berubah.
+
+**Akar masalah**: di `editTransaksi()` (`db.ts`), field `nonTunai` HANYA
+diperiksa & disimpan **di dalam** blok kondisi perubahan `statusBayar`:
+
+```ts
+if (patch.statusBayar !== undefined && patch.statusBayar !== t.statusBayar) {
+  update.statusBayar = patch.statusBayar
+  update.nonTunai = patch.nonTunai ?? false   // <- cuma ke-eksekusi kalau status BERUBAH
+  perubahan.push('status bayar')
+}
+```
+
+Kalau `statusBayar` yang baru SAMA dengan yang lama (mis. tetap "sudah",
+cuma `nonTunai`-nya yang berubah), seluruh blok `if` ini dilewati — jadi
+`update.nonTunai` tidak pernah diset. Karena tidak ada field lain yang
+berubah di skenario ini, objek `update` jadi kosong dan fungsi berhenti di
+baris `if (Object.keys(update).length === 0) return` — persis seperti
+"tidak menyimpan apa-apa" yang dilaporkan.
+
+**Perbaikan**: pisahkan pengecekan `nonTunai` jadi blok `if` sendiri yang
+independen dari `statusBayar`, bukan bersarang di dalamnya:
+
+```ts
+if (patch.statusBayar !== undefined && patch.statusBayar !== t.statusBayar) {
+  update.statusBayar = patch.statusBayar
+  perubahan.push('status bayar')
+}
+if (patch.nonTunai !== undefined && patch.nonTunai !== (t.nonTunai ?? false)) {
+  update.nonTunai = patch.nonTunai
+  perubahan.push('metode bayar (tunai/non-tunai)')
+}
+```
+
+Sekarang perubahan `nonTunai` terdeteksi & tersimpan terlepas dari apakah
+`statusBayar` ikut berubah atau tidak.
+
+**Pelajaran**: kalau sebuah field cuma disimpan sebagai "efek samping" di
+dalam blok `if` milik field lain (bukan diperiksa sendiri), itu jadi celah
+diam-diam — begitu user mengubah field itu SENDIRIAN tanpa field yang jadi
+"induk"-nya ikut berubah, perubahannya hilang tanpa jejak error. Setiap
+field yang bisa diubah independen oleh UI sebaiknya punya pengecekan
+`if (berubah)`-nya sendiri, bukan dinumpangkan di kondisi field lain.
+
+---
+
 ## Ringkasan pola yang berulang
 
 Kalau dilihat lagi, sebagian besar bug di atas berasal dari 3 sumber
